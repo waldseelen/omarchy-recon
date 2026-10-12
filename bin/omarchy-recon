@@ -204,7 +204,7 @@ exec foot \
       }
     '\'')
 
-    HEADER="[ENTER] Open │ [CTRL+T] Term │ [CTRL+O] Reveal │ [CTRL+E] Edit │ [CTRL+Y] Path │ [ALT+Y] Copy │ [CTRL+DEL] Trash │ [ESC] Close\n[ALT+A] All │ [ALT+F] Dirs │ [ALT+D] Docs │ [ALT+C] Code │ [ALT+P] PDFs │ [ALT+O] Office │ [CTRL+/] Toggle Layout"
+    HEADER="[ENTER] Open │ [CTRL+T] Term │ [CTRL+O] Reveal │ [CTRL+E] Edit │ [CTRL+Y] Path │ [ALT+Y] Copy │ [CTRL+X] Trash │ [ESC] Close\n[ALT+A] All │ [ALT+F] Dirs │ [ALT+D] Docs │ [ALT+C] Code │ [ALT+P] PDFs │ [ALT+O] Office │ [CTRL+/] Toggle Layout"
 
     selected=$(printf "%s\n" "$data" | fzf \
       --delimiter="\t" \
@@ -221,7 +221,7 @@ exec foot \
       --bind="ctrl-t:execute-silent(d={2}; [[ -f \"\$d\" ]] && d=\$(dirname \"\$d\"); nohup xdg-terminal-exec --dir=\"\$d\" >/dev/null 2>&1 || nohup foot -D \"\$d\" >/dev/null 2>&1 &)+abort" \
       --bind="ctrl-o:execute-silent(d={2}; [[ -f \"\$d\" ]] && d=\$(dirname \"\$d\"); nohup xdg-open \"\$d\" >/dev/null 2>&1 &)+abort" \
       --bind="ctrl-e:execute(\${EDITOR:-nvim} {2})+abort" \
-      --bind="ctrl-del:execute-silent(gio trash {2} 2>/dev/null && notify-send \"Recon\" \"Moved to trash: \$(basename {2})\")+abort" \
+      --bind="ctrl-delete,ctrl-x:execute-silent(gio trash {2} 2>/dev/null && notify-send \"Recon\" \"Moved to trash: \$(basename {2})\")+abort" \
       --bind="ctrl-/:change-preview-window(right,50%,wrap|down,50%,wrap|hidden)" \
       --bind="alt-a:change-query()" \
       --bind="alt-f:change-query([DIR] )" \
