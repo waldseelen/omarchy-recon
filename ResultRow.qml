@@ -53,7 +53,7 @@ Rectangle {
     anchors.right: parent.right
     anchors.rightMargin: Style.space(12)
     anchors.verticalCenter: parent.verticalCenter
-    width: Style.space(65)
+    width: Math.max(Style.space(65), implicitWidth)
     text: rowRoot.rowSize
     textFormat: Text.PlainText
     color: rowRoot.isSelected ? Color.menu.selectedText : Color.menu.text

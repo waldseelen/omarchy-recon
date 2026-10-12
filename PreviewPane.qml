@@ -55,7 +55,7 @@ Item {
         Text {
           text: previewRoot.fileName || "Preview"
           color: Color.menu.text
-          font.family: Style.font.menuFamily
+          font.family: Style.font.family
           font.pixelSize: Style.font.body
           font.weight: Font.DemiBold
           elide: Text.ElideRight
@@ -89,7 +89,7 @@ Item {
           anchors.centerIn: parent
           text: previewRoot.content.length > 0 ? "Copy All" : "Copy Path"
           color: copyMouse.containsMouse ? Color.menu.selectedText : Color.menu.text
-          font.family: Style.font.menuFamily
+          font.family: Style.font.family
           font.pixelSize: Style.font.caption
           font.weight: Font.Medium
         }
@@ -176,7 +176,7 @@ Item {
           text: previewRoot.fullPath ? (previewRoot.isLoading ? "Loading preview..." : "No preview available") : "Select an item to preview"
           color: Color.menu.text
           opacity: 0.5
-          font.family: Style.font.menuFamily
+          font.family: Style.font.family
           font.pixelSize: Style.font.body
         }
       }

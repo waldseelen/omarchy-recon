@@ -16,12 +16,19 @@ Item {
   property string targetDir: "/run/media/hp/SSS"
   property string filterText: ""
   property string activeTab: "all"
+  property string activeSubFilter: "all"
   property int selectedIndex: 0
   property bool cursorActive: true
   property bool isSearching: false
   property bool isAnimatingOut: false
   property int animationDurationIn: 130
   property int animationDurationOut: 80
+
+  // Settings State
+  property bool settingsOpen: false
+  property var excludeDirs: ["DOTFILES", "BRAIN", "KUBUNTU", "WIN", "MEDIA", ".Trash-1000", "node_modules", ".git"]
+  property var excludeExts: ["tmp", "bak", "log", "iso", "bin"]
+  property bool excludeHidden: true
 
   // Preview state
   property string previewContent: ""
@@ -42,14 +49,44 @@ Item {
   property color selectedBackground: Color.menu.selectedBackground
   property color selectedText: Color.menu.selectedText
   readonly property int cornerRadius: Style.cornerRadius
-  property string fontFamily: Style.font.menuFamily
+  property string fontFamily: Style.font.family
   property int contentMargin: Style.spacing.panelPadding
   property int headerHeight: Math.max(Style.space(42), Style.font.title + Style.spacing.controlPaddingY * 2)
-  property int tabsHeight: Style.space(28)
   property int footerHeight: Style.space(26)
   property int contentSpacing: Style.spacing.md
   property int cardWidth: Math.min(Style.space(1040), panel.width - Style.gapsOut * 2)
   property int cardHeight: Math.min(Style.space(660), panel.height - Style.gapsOut * 2)
+
+  // ---- Settings Persistence ----
+  FileView {
+    id: configFile
+    path: root.home + "/.config/omarchy/recon.json"
+    watchChanges: false
+    atomicWrites: true
+    printErrors: false
+    onLoaded: root.loadConfig(text())
+    onLoadFailed: root.saveConfig()
+  }
+
+  function loadConfig(raw) {
+    try {
+      var data = JSON.parse(String(raw || "").trim() || "{}")
+      if (data.targetDir && typeof data.targetDir === "string") root.targetDir = data.targetDir
+      if (Array.isArray(data.excludeDirs)) root.excludeDirs = data.excludeDirs
+      if (Array.isArray(data.excludeExts)) root.excludeExts = data.excludeExts
+      if (typeof data.excludeHidden === "boolean") root.excludeHidden = data.excludeHidden
+    } catch(e) {}
+  }
+
+  function saveConfig() {
+    var payload = {
+      targetDir: root.targetDir,
+      excludeDirs: root.excludeDirs,
+      excludeExts: root.excludeExts,
+      excludeHidden: root.excludeHidden
+    }
+    configFile.setText(JSON.stringify(payload, null, 2) + "\n")
+  }
 
   // ---- Lifecycle ----
   function open(payloadJson) {
@@ -60,10 +97,12 @@ Item {
     }
     root.opened = true
     root.isAnimatingOut = false
+    root.settingsOpen = false
     root.filterText = ""
     root.selectedIndex = 0
     root.cursorActive = true
     root.activeTab = "all"
+    root.activeSubFilter = "all"
     displayModel.clear()
     clearPreview()
     root.executeSearch()
@@ -73,6 +112,7 @@ Item {
   function close() {
     root.opened = false
     root.isAnimatingOut = false
+    root.settingsOpen = false
     if (searchProc.running) searchProc.running = false
     if (previewProc.running) previewProc.running = false
     searchDebounce.stop()
@@ -80,6 +120,10 @@ Item {
   }
 
   function dismiss() {
+    if (root.settingsOpen) {
+      root.settingsOpen = false
+      return
+    }
     if (root.isAnimatingOut) return
     root.isAnimatingOut = true
     if (searchProc.running) searchProc.running = false
@@ -114,13 +158,20 @@ Item {
   }
 
   function setActiveTab(tab) {
-    if (root.activeTab === tab) return
+    if (root.activeTab === tab && root.activeSubFilter === "all") return
     root.activeTab = tab
+    root.activeSubFilter = "all"
+    searchDebounce.restart()
+  }
+
+  function setActiveSubFilter(ext) {
+    if (root.activeSubFilter === ext) return
+    root.activeSubFilter = ext
     searchDebounce.restart()
   }
 
   function cycleTab(delta) {
-    var tabs = ["all", "folders", "docs", "code", "pdf", "office", "images"]
+    var tabs = ["all", "folders", "docs", "code", "office", "images"]
     var idx = tabs.indexOf(root.activeTab)
     if (idx === -1) idx = 0
     var nextIdx = (idx + delta + tabs.length) % tabs.length
@@ -207,21 +258,47 @@ Item {
     var target = root.targetDir
     var q = root.filterText.trim()
     var tab = root.activeTab
+    var sub = root.activeSubFilter
 
     var typeFlags = ""
-    if (tab === "folders") typeFlags = "-t d"
-    else if (tab === "docs") typeFlags = "-t f -e md -e txt -e org -e pdf"
-    else if (tab === "code") typeFlags = "-t f -e py -e js -e ts -e html -e css -e lua -e c -e cpp -e rs -e go -e json"
-    else if (tab === "pdf") typeFlags = "-t f -e pdf"
-    else if (tab === "office") typeFlags = "-t f -e docx -e doc -e odt -e xlsx -e pptx -e csv"
-    else if (tab === "images") typeFlags = "-t f -e png -e jpg -e jpeg -e webp -e gif -e svg"
+    if (tab === "folders") {
+      typeFlags = "-t d"
+    } else if (tab === "docs") {
+      if (sub === "md") typeFlags = "-t f -e md"
+      else if (sub === "pdf") typeFlags = "-t f -e pdf"
+      else if (sub === "txt") typeFlags = "-t f -e txt"
+      else if (sub === "org") typeFlags = "-t f -e org"
+      else typeFlags = "-t f -e md -e txt -e org -e pdf"
+    } else if (tab === "code") {
+      if (sub === "all") typeFlags = "-t f -e py -e js -e ts -e html -e css -e lua -e c -e cpp -e rs -e go -e json"
+      else if (sub === "c") typeFlags = "-t f -e c -e cpp -e h -e hpp"
+      else typeFlags = "-t f -e " + sub
+    } else if (tab === "office") {
+      if (sub === "all") typeFlags = "-t f -e docx -e doc -e odt -e xlsx -e pptx -e csv"
+      else typeFlags = "-t f -e " + sub
+    } else if (tab === "images") {
+      if (sub === "all") typeFlags = "-t f -e png -e jpg -e jpeg -e webp -e gif -e svg"
+      else if (sub === "jpg") typeFlags = "-t f -e jpg -e jpeg"
+      else typeFlags = "-t f -e " + sub
+    }
 
+    var excludeFlags = ""
+    for (var i = 0; i < root.excludeDirs.length; i++) {
+      var d = String(root.excludeDirs[i] || "").trim()
+      if (d) excludeFlags += " --exclude " + Util.shellQuote(d)
+    }
+    for (var j = 0; j < root.excludeExts.length; j++) {
+      var ext = String(root.excludeExts[j] || "").trim().replace(/^\./, "")
+      if (ext) excludeFlags += " -E '*." + ext + "'"
+    }
+
+    var hiddenFlag = root.excludeHidden ? "" : "-H"
     var depthFlag = q ? "" : "--max-depth 3"
     var quotedTarget = Util.shellQuote(target)
     var patternArg = q ? Util.shellQuote(q) : "''"
 
     var cmd = "t=" + quotedTarget + "; [[ ! -d \"$t\" ]] && t=\"$HOME\"; " +
-              "fd -i --exclude DOTFILES --exclude BRAIN --exclude KUBUNTU --exclude WIN --exclude MEDIA --exclude '.Trash*' " +
+              "fd -i " + hiddenFlag + " " + excludeFlags + " " +
               typeFlags + " " + depthFlag + " " + patternArg + " \"$t\" 2>/dev/null | head -n 250 | xargs -d '\\n' -r stat --printf='%F\\t%s\\t%n\\n' 2>/dev/null"
 
     if (searchProc.running) searchProc.running = false
@@ -412,9 +489,20 @@ Item {
         focus: true
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: function(event) {
+          if (root.settingsOpen) {
+            if (event.key === Qt.Key_Escape) {
+              root.settingsOpen = false
+              event.accepted = true
+            }
+            return
+          }
+
           if (event.key === Qt.Key_Escape) {
             if (root.filterText) root.setFilter("")
             else root.dismiss()
+            event.accepted = true
+          } else if ((event.key === Qt.Key_Comma) && (event.modifiers & Qt.ControlModifier)) {
+            root.settingsOpen = !root.settingsOpen
             event.accepted = true
           } else if (event.key === Qt.Key_Tab) {
             root.cycleTab(event.modifiers & Qt.ShiftModifier ? -1 : 1)
@@ -472,28 +560,31 @@ Item {
         anchors.leftMargin: card.contentLeftInset
         spacing: root.contentSpacing
 
-        // Search Header
+        // Search Header (with ⚙ Settings button)
         ReconHeader {
           width: parent.width
           height: root.headerHeight
           filterText: root.filterText
           itemCount: displayModel.count
           isSearching: root.isSearching
+          onSettingsClicked: root.settingsOpen = !root.settingsOpen
         }
 
-        // Category Filter Tabs
+        // Category Filter Tabs (with Dynamic Sub-Filters)
         ReconTabs {
+          id: tabsRow
           width: parent.width
-          height: root.tabsHeight
           activeTab: root.activeTab
+          activeSubFilter: root.activeSubFilter
           onTabSelected: function(tab) { root.setActiveTab(tab) }
+          onSubFilterSelected: function(ext) { root.setActiveSubFilter(ext) }
         }
 
         // Split Main View: Results List + Preview Pane
         Item {
           id: bodyArea
           width: parent.width
-          height: parent.height - root.headerHeight - root.tabsHeight - root.footerHeight - root.contentSpacing * 3
+          height: Math.max(Style.space(120), parent.height - root.headerHeight - tabsRow.implicitHeight - root.footerHeight - root.contentSpacing * 3)
 
           Row {
             anchors.fill: parent
@@ -551,7 +642,7 @@ Item {
 
                 Text {
                   anchors.horizontalCenter: parent.horizontalCenter
-                  text: root.filterText ? "No matches found" : "No files found in SSS"
+                  text: root.filterText ? "No matches found" : "No files found in target"
                   color: Color.menu.text
                   opacity: 0.55
                   font.family: root.fontFamily
@@ -588,7 +679,7 @@ Item {
 
           Row {
             anchors.centerIn: parent
-            spacing: Style.space(16)
+            spacing: Style.space(14)
 
             Repeater {
               model: [
@@ -596,6 +687,7 @@ Item {
                 { key: "⇧ Shift+Enter", desc: "Copy Path" },
                 { key: "⎇ Alt+Enter", desc: "Folder" },
                 { key: "Tab", desc: "Category" },
+                { key: "^,", desc: "Settings" },
                 { key: "Del / ^D", desc: "Trash" },
                 { key: "Esc", desc: "Close" }
               ]
@@ -636,6 +728,25 @@ Item {
               }
             }
           }
+        }
+      }
+
+      // Settings Modal Dialog Overlay
+      SettingsDialog {
+        visible: root.settingsOpen
+        targetDir: root.targetDir
+        excludeDirs: root.excludeDirs
+        excludeExts: root.excludeExts
+        excludeHidden: root.excludeHidden
+        onClosed: root.settingsOpen = false
+        onSaved: function(newTarget, newDirs, newExts, newHidden) {
+          root.targetDir = newTarget
+          root.excludeDirs = newDirs
+          root.excludeExts = newExts
+          root.excludeHidden = newHidden
+          root.saveConfig()
+          root.settingsOpen = false
+          root.executeSearch()
         }
       }
     }
