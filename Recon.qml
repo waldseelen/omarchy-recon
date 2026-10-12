@@ -523,11 +523,11 @@ Item {
                   required property bool isDir
 
                   isSelected: root.cursorActive && index === root.selectedIndex
-                  tag: tag
-                  name: name
-                  dir: dir
-                  sizeText: sizeText
-                  fullPath: path
+                  rowTag: tag
+                  rowName: name
+                  rowDir: dir
+                  rowSize: sizeText
+                  rowPath: path
 
                   onClicked: {
                     root.selectAbsolute(index)
