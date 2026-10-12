@@ -1,6 +1,6 @@
 # ==============================================================================
-# omarchy-scout configuration
-# Location: ~/.config/omarchy/scout.conf
+# omarchy-recon configuration
+# Location: ~/.config/omarchy/recon.conf
 # ==============================================================================
 
 # Default target directory to search (can be overridden via CLI argument)

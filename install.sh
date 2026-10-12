@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# omarchy-scout Installer
+# omarchy-recon Installer
 # ==============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BIN_TARGET="${HOME}/.local/bin/omarchy-scout"
+BIN_TARGET="${HOME}/.local/bin/omarchy-recon"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy"
-CONFIG_FILE="${CONFIG_DIR}/scout.conf"
+CONFIG_FILE="${CONFIG_DIR}/recon.conf"
 
-echo "==> Installing omarchy-scout..."
+echo "==> Installing omarchy-recon..."
 
 # 1. Check dependencies
 deps=(fd fzf foot bat wl-copy)
@@ -32,14 +32,14 @@ fi
 
 # 2. Link executable
 mkdir -p "${HOME}/.local/bin"
-ln -sf "${SCRIPT_DIR}/bin/omarchy-scout" "$BIN_TARGET"
+ln -sf "${SCRIPT_DIR}/bin/omarchy-recon" "$BIN_TARGET"
 chmod +x "$BIN_TARGET"
-echo "  [OK] Linked ${BIN_TARGET} -> ${SCRIPT_DIR}/bin/omarchy-scout"
+echo "  [OK] Linked ${BIN_TARGET} -> ${SCRIPT_DIR}/bin/omarchy-recon"
 
 # 3. Create default config if not present
 mkdir -p "$CONFIG_DIR"
 if [[ ! -f "$CONFIG_FILE" ]]; then
-  cp "${SCRIPT_DIR}/config/scout.conf.example" "$CONFIG_FILE"
+  cp "${SCRIPT_DIR}/config/recon.conf.example" "$CONFIG_FILE"
   echo "  [OK] Created default config at ${CONFIG_FILE}"
 else
   echo "  [INFO] Existing config preserved at ${CONFIG_FILE}"
@@ -51,7 +51,7 @@ echo "==> Installation complete!"
 echo ""
 echo "To enable the floating window rule and keybinding, add this to your ~/.config/hypr/bindings.lua:"
 echo ""
-echo "  o.window(\"omarchy-scout.float\", { float = true, center = true, size = { 1350, 780 } })"
-echo "  o.bind(\"SUPER + M\", \"Scout File Search\", \"omarchy-scout\")"
+echo "  o.window(\"omarchy-recon.float\", { float = true, center = true, size = { 1350, 780 } })"
+echo "  o.bind(\"SUPER + M\", \"Recon File Search\", \"omarchy-recon\")"
 echo ""
 echo "Then reload Hyprland: hyprctl reload"
