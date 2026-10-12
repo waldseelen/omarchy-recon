@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# omarchy-recon: Fast floating file explorer, live previewer, and launcher
+# omarchy-recon: Fast floating file & directory explorer, previewer and launcher
 #
 # omarchy:summary=Fast floating file search and launcher with instant preview and auto-copy
 # omarchy:group=file
@@ -17,6 +17,7 @@ CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/recon.conf"
 TARGET_DIR="${HOME}"
 EXCLUDE_DIRS="DOTFILES BRAIN KUBUNTU WIN MEDIA .Trash-1000 .trash .git node_modules __pycache__ .venv"
 INCLUDE_HIDDEN="false"
+INCLUDE_DIRS="true"
 PREVIEW_LAYOUT="down:50%:wrap"
 WINDOW_WIDTH=1350
 WINDOW_HEIGHT=780
@@ -30,7 +31,7 @@ fi
 # Parse CLI arguments
 show_help() {
   cat <<'EOF'
-omarchy-recon: Fast floating file search and launcher for Omarchy
+omarchy-recon: Fast floating file & directory search and launcher for Omarchy
 
 Usage:
   omarchy-recon [path] [options]
@@ -42,17 +43,31 @@ Arguments:
 Options:
   --exclude <dirs>     Space-separated folder names to exclude
   --hidden             Include hidden files and folders (default: excluded)
-  --preview <layout>   Initial preview layout (e.g. 'down:50%:wrap' or 'right:50%:wrap')
+  --no-dirs            Exclude directories from search results
+  --preview <layout>   Initial preview layout ('down:50%:wrap', 'right:50%:wrap', 'hidden')
   -h, --help           Show this help message
 
 Keybindings in Recon:
-  [ENTER]              Open selected file with default system application
-  [CTRL+Y]             Copy file path to clipboard and exit
-  [ALT+Y]              Copy full file content to clipboard and exit
-  [CTRL+/]             Toggle preview layout (Bottom -> Right -> Hidden)
-  [PAGE UP / DOWN]     Scroll preview window
-  [ESC]                Close window immediately
-  [MOUSE SELECT]       Auto-copies selected text to Wayland clipboard
+  Actions:
+    [ENTER]            Open file or folder in default application
+    [CTRL+T]           Open terminal in selected item's directory
+    [CTRL+O]           Reveal item in desktop file manager
+    [CTRL+E]           Edit file in terminal editor ($EDITOR / nvim)
+    [CTRL+Y]           Copy absolute path to clipboard and exit
+    [ALT+Y]            Copy file text contents to clipboard and exit
+    [CTRL+DEL]         Safely move item to desktop trash (gio trash)
+    [CTRL+/]           Toggle preview layout (Bottom -> Right -> Hidden)
+    [PAGE UP / DOWN]   Scroll preview window
+    [ESC]              Close window immediately
+    [MOUSE SELECT]     Auto-copies selected preview text to Wayland clipboard
+
+  Category Filters:
+    [ALT+A]            All items (clear filter)
+    [ALT+F]            Folders only ([DIR])
+    [ALT+D]            Documents & Notes ([MD])
+    [ALT+C]            Source Code ([CODE])
+    [ALT+P]            PDF documents ([PDF])
+    [ALT+O]            Office files ([OFFICE])
 EOF
   exit 0
 }
@@ -68,6 +83,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --hidden)
       INCLUDE_HIDDEN="true"
+      shift
+      ;;
+    --no-dirs)
+      INCLUDE_DIRS="false"
       shift
       ;;
     --preview)
@@ -113,9 +132,13 @@ exec foot \
     label="$2"
     excludes_str="$3"
     include_hidden="$4"
-    preview_layout="$5"
+    include_dirs="$5"
+    preview_layout="$6"
 
     fd_args=(-t f)
+    if [[ "$include_dirs" == "true" ]]; then
+      fd_args+=(-t d)
+    fi
     if [[ "$include_hidden" == "true" ]]; then
       fd_args+=(-H)
     fi
@@ -126,27 +149,36 @@ exec foot \
     done
 
     # Collect file paths and sizes in safe tab-separated stream
-    data=$(fd "${fd_args[@]}" . "$target" -X stat --printf="%s\t%n\n" 2>/dev/null | awk -F"\t" -v base="$target/" -v lbl="$label" '\''
+    data=$(fd "${fd_args[@]}" . "$target" -X stat --printf="%F\t%s\t%n\n" 2>/dev/null | awk -F"\t" -v base="$target/" -v lbl="$label" '\''
       function fmt_size(b) {
         if (b >= 1048576) return sprintf("%5.1fM", b/1048576)
         if (b >= 1024) return sprintf("%5.1fK", b/1024)
         return sprintf("%5dB", b)
       }
       {
-        bytes = $1
-        full = $2
+        type = $1
+        bytes = $2
+        full = $3
         name = full
         sub(".*/", "", name)
-        ext = tolower(substr(name, match(name, /\.[^.]+$/) + 1))
-        if (ext == "" || ext == name) ext = "txt"
 
-        tag = "[OTHER]"
-        if (ext == "md") { tag = "[MD]"; c_md++ }
-        else if (ext == "pdf") { tag = "[PDF]"; c_pdf++ }
-        else if (ext == "json") { tag = "[JSON]"; c_json++ }
-        else if (ext ~ /^(py|js|ts|m|sh|html|css|lua)$/) { tag = "[CODE]"; c_code++ }
-        else if (ext ~ /^(docx|doc|odt|xlsx|pptx)$/) { tag = "[OFFICE]"; c_office++ }
-        else { c_other++ }
+        if (type == "directory") {
+          tag = "[DIR]"
+          c_dir++
+          sz = "   DIR"
+        } else {
+          ext = tolower(substr(name, match(name, /\.[^.]+$/) + 1))
+          if (ext == "" || ext == name) ext = "txt"
+
+          tag = "[OTHER]"
+          if (ext == "md") { tag = "[MD]"; c_md++ }
+          else if (ext == "pdf") { tag = "[PDF]"; c_pdf++ }
+          else if (ext == "json") { tag = "[JSON]"; c_json++ }
+          else if (ext ~ /^(py|js|ts|m|sh|html|css|lua|c|cpp|rs|go)$/) { tag = "[CODE]"; c_code++ }
+          else if (ext ~ /^(docx|doc|odt|xlsx|pptx)$/) { tag = "[OFFICE]"; c_office++ }
+          else { c_other++ }
+          sz = fmt_size(bytes)
+        }
 
         rel = full
         sub(base, "", rel)
@@ -161,10 +193,10 @@ exec foot \
         if (length(name) > 40) disp_name = substr(name, 1, 37) "..."
         else disp_name = name
 
-        lines[++n] = sprintf("%-8s  %-40s  %-35s  %7s\t%s", tag, disp_name, dir, fmt_size(bytes), full)
+        lines[++n] = sprintf("%-8s  %-40s  %-35s  %7s\t%s", tag, disp_name, dir, sz, full)
       }
       END {
-        printf "📊 %s: %d Files (PDF: %d │ MD: %d │ CODE: %d │ JSON: %d │ OFFICE: %d │ OTHER: %d)\t\n", lbl, n, c_pdf, c_md, c_code, c_json, c_office, c_other
+        printf "📊 %s: %d Items (DIR: %d │ PDF: %d │ MD: %d │ CODE: %d │ OFFICE: %d │ OTHER: %d)\t\n", lbl, n, c_dir, c_pdf, c_md, c_code, c_office, c_other
         printf "%-8s  %-40s  %-35s  %7s\t\n", "TYPE", "FILE", "FOLDER", "SIZE"
         for (i = 1; i <= n; i++) {
           print lines[i]
@@ -172,7 +204,7 @@ exec foot \
       }
     '\'')
 
-    HEADER="[ENTER] Open │ [CTRL+Y] Copy Path │ [ALT+Y] Copy Content │ [CTRL+/] Toggle Layout │ [ESC] Close"
+    HEADER="[ENTER] Open │ [CTRL+T] Term │ [CTRL+O] Reveal │ [CTRL+E] Edit │ [CTRL+Y] Path │ [ALT+Y] Copy │ [CTRL+DEL] Trash │ [ESC] Close\n[ALT+A] All │ [ALT+F] Dirs │ [ALT+D] Docs │ [ALT+C] Code │ [ALT+P] PDFs │ [ALT+O] Office │ [CTRL+/] Toggle Layout"
 
     selected=$(printf "%s\n" "$data" | fzf \
       --delimiter="\t" \
@@ -186,16 +218,39 @@ exec foot \
       --bind="esc:abort" \
       --bind="ctrl-y:execute-silent(printf %s {2} | wl-copy)+abort" \
       --bind="alt-y:execute-silent(cat {2} | wl-copy)+abort" \
+      --bind="ctrl-t:execute-silent(d={2}; [[ -f \"\$d\" ]] && d=\$(dirname \"\$d\"); nohup xdg-terminal-exec --dir=\"\$d\" >/dev/null 2>&1 || nohup foot -D \"\$d\" >/dev/null 2>&1 &)+abort" \
+      --bind="ctrl-o:execute-silent(d={2}; [[ -f \"\$d\" ]] && d=\$(dirname \"\$d\"); nohup xdg-open \"\$d\" >/dev/null 2>&1 &)+abort" \
+      --bind="ctrl-e:execute(\${EDITOR:-nvim} {2})+abort" \
+      --bind="ctrl-del:execute-silent(gio trash {2} 2>/dev/null && notify-send \"Recon\" \"Moved to trash: \$(basename {2})\")+abort" \
       --bind="ctrl-/:change-preview-window(right,50%,wrap|down,50%,wrap|hidden)" \
+      --bind="alt-a:change-query()" \
+      --bind="alt-f:change-query([DIR] )" \
+      --bind="alt-d:change-query([MD] )" \
+      --bind="alt-c:change-query([CODE] )" \
+      --bind="alt-p:change-query([PDF] )" \
+      --bind="alt-o:change-query([OFFICE] )" \
       --bind="page-up:preview-page-up,page-down:preview-page-down" \
-      --preview='\''f={2}; if [[ "$f" =~ \.(pdf|PDF)$ ]]; then pdftotext -l 10 "$f" - 2>/dev/null || echo "[PDF Text Unavailable]"; else bat --style=numbers --color=always "$f" 2>/dev/null || cat "$f" 2>/dev/null; fi'\'' \
+      --preview='\''f={2}; \
+        if [[ -d "$f" ]]; then \
+          eza --tree --level=2 --color=always --icons=always "$f" 2>/dev/null || tree -L 2 -C "$f" 2>/dev/null || ls -lhA --color=always "$f"; \
+        elif [[ "$f" =~ \.(png|jpg|jpeg|webp|gif|svg)$ ]]; then \
+          if command -v chafa >/dev/null 2>&1; then \
+            chafa -s 80x25 "$f" 2>/dev/null; \
+          else \
+            file -b "$f"; echo ""; echo "[Install chafa for high-res terminal image preview: sudo pacman -S chafa]"; \
+          fi; \
+        elif [[ "$f" =~ \.(pdf|PDF)$ ]]; then \
+          pdftotext -l 10 "$f" - 2>/dev/null || echo "[PDF Text Unavailable]"; \
+        else \
+          bat --style=numbers --color=always "$f" 2>/dev/null || cat "$f" 2>/dev/null; \
+        fi'\'' \
       --preview-window="$preview_layout")
 
     if [[ -n "$selected" ]]; then
       chosen_path=$(printf "%s" "$selected" | cut -f2)
-      if [[ -f "$chosen_path" ]]; then
+      if [[ -e "$chosen_path" ]]; then
         nohup xdg-open "$chosen_path" >/dev/null 2>&1 &
         sleep 0.1
       fi
     fi
-  ' _ "$TARGET_DIR" "$LABEL" "$EXCLUDE_DIRS" "$INCLUDE_HIDDEN" "$PREVIEW_LAYOUT"
+  ' _ "$TARGET_DIR" "$LABEL" "$EXCLUDE_DIRS" "$INCLUDE_HIDDEN" "$INCLUDE_DIRS" "$PREVIEW_LAYOUT"

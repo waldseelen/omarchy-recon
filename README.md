@@ -1,23 +1,42 @@
 # omarchy-recon 🔭
 
-A blazing-fast floating file explorer, live previewer, and launcher plugin designed for [Omarchy](https://github.com/omarchy) and Hyprland.
+A blazing-fast floating file & directory explorer, live previewer, and launcher plugin designed for [Omarchy](https://github.com/omarchy) and Hyprland.
 
-Powered by `foot`, `fzf`, `fd`, and `bat`.
+Powered by `foot`, `fzf`, `fd`, `bat`, `eza`, and `chafa`.
 
 ---
 
 ## ✨ Features
 
-- ⚡ **Instant Search**: Sub-millisecond indexing of tens of thousands of files via `fd` and POSIX `stat`.
-- 📐 **Aligned 4-Column Layout**: Clear display showing `[TYPE]`, `[FILE]`, `[FOLDER]`, and `[SIZE]`.
-- 📊 **Dynamic Stats Bar**: Real-time breakdown of file types (`PDF`, `MD`, `CODE`, `JSON`, `OFFICE`, `OTHER`) and total count.
+- ⚡ **Instant Search**: Sub-millisecond indexing of tens of thousands of files and directories via `fd` and POSIX `stat`.
+- 📐 **Aligned 4-Column Layout**: Clear tabular display showing `[TYPE]`, `[FILE]`, `[FOLDER]`, and `[SIZE]`.
+- 📊 **Dynamic Stats Bar**: Real-time breakdown of item types (`DIR`, `PDF`, `MD`, `CODE`, `OFFICE`, `OTHER`) and total count.
+- 🎯 **Instant Category Filters**:
+  - `ALT+A` (All items)
+  - `ALT+F` (Directories only)
+  - `ALT+D` (Documents & Markdown)
+  - `ALT+C` (Source Code)
+  - `ALT+P` (PDFs only)
+  - `ALT+O` (Office files)
+- 🗂️ **Multi-Format Live Previews**:
+  - **Directories**: Formatted colored directory trees via `eza` / `tree`.
+  - **Code & Markdown**: Syntax-highlighted text via `bat`.
+  - **PDFs**: Text extraction via `pdftotext`.
+  - **Images**: High-resolution terminal graphics via `chafa` (with metadata fallback).
+- ⌨️ **Rich Keyboard Actions**:
+  - `ENTER`: Open file or folder in default desktop application.
+  - `CTRL+T`: Open terminal directly inside selected item's directory (`xdg-terminal-exec`).
+  - `CTRL+O`: Reveal folder in desktop file manager (`xdg-open`).
+  - `CTRL+E`: Edit file in terminal editor (`$EDITOR` / `nvim`).
+  - `CTRL+DEL`: Safely move item to desktop trash (`gio trash`).
+  - `CTRL+Y`: Copy absolute file path to clipboard (`wl-copy`).
+  - `ALT+Y`: Copy complete file text contents to clipboard (`wl-copy`).
 - 📋 **Seamless Auto-Copy**: Selecting text with the mouse inside the preview pane automatically copies it to the Wayland clipboard (`wl-copy`).
 - 🛡️ **Clean Text Selection**: Dedicated bottom preview layout prevents terminal wrap-around from polluting preview text selections with file list columns.
 - 🔄 **Dynamic Layout Switching**: Toggle instantly between **Bottom**, **Right** (side-by-side), and **Hidden** preview modes via `CTRL+/`.
-- 📑 **Rich Document Previews**: Syntax highlighting for code/markdown via `bat`, plain text fallback, and instant text extraction for PDF documents via `pdftotext`.
 - 🪟 **True Toggle Window**: Pressing the keybinding toggles the window open and closed instantly. Single `ESC` closes without delay.
 - 🚫 **Smart Filtering**: Skips hidden directories (`.*`) by default, with custom exclusion lists.
-- 🤖 **AI Agent Ready**: Includes [`AGENT.md`](AGENT.md) for quick customization by any AI coding assistant (Antigravity, Cursor, Claude Code, Copilot).
+- 🤖 **AI Agent Ready**: Includes [`AGENT.md`](AGENT.md) for quick customization by any AI coding assistant.
 
 ---
 
@@ -27,13 +46,13 @@ Powered by `foot`, `fzf`, `fd`, and `bat`.
 - **Terminal**: `foot`
 - **Fuzzy Finder**: `fzf`
 - **Search Tool**: `fd`
-- **Previewer**: `bat`
-- **Clipboard**: `wl-clipboard` (`wl-copy`)
-- *(Optional)*: `poppler` (`pdftotext`) for PDF text previewing
+- **Previewer**: `bat`, `eza`
+- **Clipboard & Actions**: `wl-clipboard` (`wl-copy`), `glib2` (`gio`), `xdg-terminal-exec`
+- *(Optional)*: `poppler` (`pdftotext`) for PDF text extraction, `chafa` for terminal image rendering
 
 Install all dependencies on Arch / Omarchy:
 ```bash
-sudo pacman -S foot fzf fd bat wl-clipboard poppler
+sudo pacman -S --needed foot fzf fd bat eza wl-clipboard poppler chafa
 ```
 
 ---
@@ -56,7 +75,7 @@ o.window("omarchy-recon.float", { float = true })
 o.window("omarchy-recon.float", { center = true })
 o.window("omarchy-recon.float", { size = { 1350, 780 } })
 
--- Keybinding: SUPER + M to open Recon (with optional path):
+-- Keybinding: SUPER + M to open Recon:
 o.bind("SUPER + M", "Recon File Search", "omarchy-recon /run/media/hp/SSS")
 ```
 
@@ -67,14 +86,24 @@ hyprctl reload
 
 ---
 
-## ⌨️ Keybindings
+## ⌨️ Keybindings Reference
 
 | Shortcut | Action |
 | :--- | :--- |
-| **`ENTER`** | Open selected file in default desktop application (`xdg-open`) |
+| **`ENTER`** | Open file or folder in default application (`xdg-open`) |
+| **`CTRL + T`** | Open terminal in selected item's directory (`xdg-terminal-exec`) |
+| **`CTRL + O`** | Reveal selected item in desktop file manager (`xdg-open $(dirname ...)`) |
+| **`CTRL + E`** | Edit file in terminal editor (`$EDITOR` / `nvim`) |
 | **`CTRL + Y`** | Copy full file path to clipboard and exit |
-| **`ALT + Y`** | Copy complete file text content to clipboard and exit |
+| **`ALT + Y`** | Copy full file text content to clipboard and exit |
+| **`CTRL + DEL`** | Move item to desktop trash (`gio trash`) |
 | **`CTRL + /`** | Rotate preview layout (`Bottom` ➔ `Right` ➔ `Hidden`) |
+| **`ALT + A`** | Filter: All items (clear filter) |
+| **`ALT + F`** | Filter: Folders only (`[DIR]`) |
+| **`ALT + D`** | Filter: Documents & Markdown (`[MD]`) |
+| **`ALT + C`** | Filter: Source code (`[CODE]`) |
+| **`ALT + P`** | Filter: PDF documents (`[PDF]`) |
+| **`ALT + O`** | Filter: Office documents (`[OFFICE]`) |
 | **`PAGE UP / DOWN`** | Scroll preview pane up or down |
 | **`ESC`** | Close Recon immediately |
 | **`MOUSE SELECT`** | Highlight preview text to automatically copy to clipboard |
@@ -94,6 +123,9 @@ EXCLUDE_DIRS="DOTFILES BRAIN KUBUNTU WIN MEDIA .Trash-1000 .trash .git node_modu
 
 # Whether to include hidden files (true / false)
 INCLUDE_HIDDEN="false"
+
+# Whether to include directories (true / false)
+INCLUDE_DIRS="true"
 
 # Initial preview window layout ("down:50%:wrap" or "right:50%:wrap")
 PREVIEW_LAYOUT="down:50%:wrap"

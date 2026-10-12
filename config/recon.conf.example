@@ -3,7 +3,7 @@
 # Location: ~/.config/omarchy/recon.conf
 # ==============================================================================
 
-# Default target directory to search (can be overridden via CLI argument)
+# Default target directory to search (can be overridden via CLI argument $1)
 TARGET_DIR="${HOME}"
 
 # Space-separated list of folder names or patterns to exclude from search
@@ -13,6 +13,9 @@ EXCLUDE_DIRS="DOTFILES BRAIN KUBUNTU WIN MEDIA .Trash-1000 .trash .git node_modu
 # Default is false (all .* folders and files are skipped)
 INCLUDE_HIDDEN="false"
 
+# Whether to include directories in search results (true / false)
+INCLUDE_DIRS="true"
+
 # Initial preview window layout
 # Options:
 #   "down:50%:wrap"  - Bottom preview (cleanest for mouse text selection)
@@ -20,6 +23,6 @@ INCLUDE_HIDDEN="false"
 #   "hidden"         - Hidden until toggled via CTRL+/
 PREVIEW_LAYOUT="down:50%:wrap"
 
-# Floating window geometry (pixels)
+# Floating window geometry (pixels in Hyprland)
 WINDOW_WIDTH=1350
 WINDOW_HEIGHT=780
