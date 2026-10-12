@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# omarchy-scout: Fast floating file explorer, previewer and launcher
+#
+# omarchy:summary=Fast floating file search and launcher with instant preview and auto-copy
+# omarchy:group=file
+# omarchy:name=scout
+# omarchy:args=[path]
+# omarchy:examples=omarchy file scout|omarchy-scout /run/media/hp/SSS
+# ==============================================================================
+set -euo pipefail
+
+APP_ID="omarchy-scout.float"
+CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/scout.conf"
+
+# Default configuration
+TARGET_DIR="${HOME}"
+EXCLUDE_DIRS="DOTFILES BRAIN KUBUNTU WIN MEDIA .Trash-1000 .trash .git node_modules __pycache__ .venv"
+INCLUDE_HIDDEN="false"
+PREVIEW_LAYOUT="down:50%:wrap"
+WINDOW_WIDTH=1350
+WINDOW_HEIGHT=780
+
+# Load configuration if available
+if [[ -f "$CONFIG_FILE" ]]; then
+  # shellcheck source=/dev/null
+  source "$CONFIG_FILE"
+fi
+
+# Parse CLI arguments
+show_help() {
+  cat <<'EOF'
+omarchy-scout: Fast floating file search and launcher for Omarchy
+
+Usage:
+  omarchy-scout [path] [options]
+  omarchy file scout [path]
+
+Arguments:
+  path                 Target directory to search (default: from config or $HOME)
+
+Options:
+  --exclude <dirs>     Space-separated folder names to exclude
+  --hidden             Include hidden files and folders (default: excluded)
+  --preview <layout>   Initial preview layout (e.g. 'down:50%:wrap' or 'right:50%:wrap')
+  -h, --help           Show this help message
+
+Keybindings in Scout:
+  [ENTER]              Open selected file with default system application
+  [CTRL+Y]             Copy file path to clipboard and exit
+  [ALT+Y]              Copy full file content to clipboard and exit
+  [CTRL+/]             Toggle preview layout (Bottom -> Right -> Hidden)
+  [PAGE UP / DOWN]     Scroll preview window
+  [ESC]                Close window immediately
+  [MOUSE SELECT]       Auto-copies selected text to Wayland clipboard
+EOF
+  exit 0
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      show_help
+      ;;
+    --exclude)
+      EXCLUDE_DIRS="$2"
+      shift 2
+      ;;
+    --hidden)
+      INCLUDE_HIDDEN="true"
+      shift
+      ;;
+    --preview)
+      PREVIEW_LAYOUT="$2"
+      shift 2
+      ;;
+    -*)
+      echo "Unknown option: $1" >&2
+      show_help
+      ;;
+    *)
+      TARGET_DIR="$1"
+      shift
+      ;;
+  esac
+done
+
+# Resolve absolute path
+if [[ ! -d "$TARGET_DIR" ]]; then
+  notify-send "Scout" "Directory not found: $TARGET_DIR" 2>/dev/null || true
+  echo "Error: Directory not found: $TARGET_DIR" >&2
+  exit 1
+fi
+TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
+LABEL="$(basename "$TARGET_DIR")"
+[[ "$TARGET_DIR" == "$HOME" ]] && LABEL="Home"
+WINDOW_TITLE="Scout: ${LABEL}"
+
+# 1. TOGGLE: If Scout window is already open, close it cleanly
+if hyprctl clients -j 2>/dev/null | grep -q '"class": "'"$APP_ID"'"' || pgrep -f "foot.*-a $APP_ID" >/dev/null 2>&1; then
+  hyprctl dispatch closewindow "class:^${APP_ID}$" >/dev/null 2>&1 || true
+  pkill -9 -f "foot.*-a $APP_ID" 2>/dev/null || true
+  exit 0
+fi
+
+# Launch foot terminal floating window
+exec foot \
+  -o main.selection-target=both \
+  -a "$APP_ID" \
+  -T "$WINDOW_TITLE" \
+  bash -c '
+    target="$1"
+    label="$2"
+    excludes_str="$3"
+    include_hidden="$4"
+    preview_layout="$5"
+
+    fd_args=(-t f)
+    if [[ "$include_hidden" == "true" ]]; then
+      fd_args+=(-H)
+    fi
+
+    read -r -a exc_array <<< "$excludes_str"
+    for exc in "${exc_array[@]}"; do
+      [[ -n "$exc" ]] && fd_args+=(--exclude "$exc")
+    done
+
+    # Collect file paths and sizes in safe tab-separated stream
+    data=$(fd "${fd_args[@]}" . "$target" -X stat --printf="%s\t%n\n" 2>/dev/null | awk -F"\t" -v base="$target/" -v lbl="$label" '\''
+      function fmt_size(b) {
+        if (b >= 1048576) return sprintf("%5.1fM", b/1048576)
+        if (b >= 1024) return sprintf("%5.1fK", b/1024)
+        return sprintf("%5dB", b)
+      }
+      {
+        bytes = $1
+        full = $2
+        name = full
+        sub(".*/", "", name)
+        ext = tolower(substr(name, match(name, /\.[^.]+$/) + 1))
+        if (ext == "" || ext == name) ext = "txt"
+
+        tag = "[OTHER]"
+        if (ext == "md") { tag = "[MD]"; c_md++ }
+        else if (ext == "pdf") { tag = "[PDF]"; c_pdf++ }
+        else if (ext == "json") { tag = "[JSON]"; c_json++ }
+        else if (ext ~ /^(py|js|ts|m|sh|html|css|lua)$/) { tag = "[CODE]"; c_code++ }
+        else if (ext ~ /^(docx|doc|odt|xlsx|pptx)$/) { tag = "[OFFICE]"; c_office++ }
+        else { c_other++ }
+
+        rel = full
+        sub(base, "", rel)
+        if (index(rel, "/") == 0) {
+          dir = lbl
+        } else {
+          dir = rel
+          sub("/[^/]*$", "", dir)
+        }
+        if (length(dir) > 35) dir = "..." substr(dir, length(dir)-31)
+
+        if (length(name) > 40) disp_name = substr(name, 1, 37) "..."
+        else disp_name = name
+
+        lines[++n] = sprintf("%-8s  %-40s  %-35s  %7s\t%s", tag, disp_name, dir, fmt_size(bytes), full)
+      }
+      END {
+        printf "📊 %s: %d Files (PDF: %d │ MD: %d │ CODE: %d │ JSON: %d │ OFFICE: %d │ OTHER: %d)\t\n", lbl, n, c_pdf, c_md, c_code, c_json, c_office, c_other
+        printf "%-8s  %-40s  %-35s  %7s\t\n", "TYPE", "FILE", "FOLDER", "SIZE"
+        for (i = 1; i <= n; i++) {
+          print lines[i]
+        }
+      }
+    '\'')
+
+    HEADER="[ENTER] Open │ [CTRL+Y] Copy Path │ [ALT+Y] Copy Content │ [CTRL+/] Toggle Layout │ [ESC] Close"
+
+    selected=$(printf "%s\n" "$data" | fzf \
+      --delimiter="\t" \
+      --with-nth="1" \
+      --header-lines=2 \
+      --header="$HEADER" \
+      --header-first \
+      --prompt="🔍 Scout > " \
+      --reverse \
+      --no-mouse \
+      --bind="esc:abort" \
+      --bind="ctrl-y:execute-silent(printf %s {2} | wl-copy)+abort" \
+      --bind="alt-y:execute-silent(cat {2} | wl-copy)+abort" \
+      --bind="ctrl-/:change-preview-window(right,50%,wrap|down,50%,wrap|hidden)" \
+      --bind="page-up:preview-page-up,page-down:preview-page-down" \
+      --preview='\''f={2}; if [[ "$f" =~ \.(pdf|PDF)$ ]]; then pdftotext -l 10 "$f" - 2>/dev/null || echo "[PDF Text Unavailable]"; else bat --style=numbers --color=always "$f" 2>/dev/null || cat "$f" 2>/dev/null; fi'\'' \
+      --preview-window="$preview_layout")
+
+    if [[ -n "$selected" ]]; then
+      chosen_path=$(printf "%s" "$selected" | cut -f2)
+      if [[ -f "$chosen_path" ]]; then
+        nohup xdg-open "$chosen_path" >/dev/null 2>&1 &
+        sleep 0.1
+      fi
+    fi
+  ' _ "$TARGET_DIR" "$LABEL" "$EXCLUDE_DIRS" "$INCLUDE_HIDDEN" "$PREVIEW_LAYOUT"

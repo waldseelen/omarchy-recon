@@ -1,0 +1,25 @@
+# ==============================================================================
+# omarchy-scout configuration
+# Location: ~/.config/omarchy/scout.conf
+# ==============================================================================
+
+# Default target directory to search (can be overridden via CLI argument)
+TARGET_DIR="${HOME}"
+
+# Space-separated list of folder names or patterns to exclude from search
+EXCLUDE_DIRS="DOTFILES BRAIN KUBUNTU WIN MEDIA .Trash-1000 .trash .git node_modules __pycache__ .venv"
+
+# Whether to include hidden files and dot-folders (true / false)
+# Default is false (all .* folders and files are skipped)
+INCLUDE_HIDDEN="false"
+
+# Initial preview window layout
+# Options:
+#   "down:50%:wrap"  - Bottom preview (cleanest for mouse text selection)
+#   "right:50%:wrap" - Side-by-side split
+#   "hidden"         - Hidden until toggled via CTRL+/
+PREVIEW_LAYOUT="down:50%:wrap"
+
+# Floating window geometry (pixels)
+WINDOW_WIDTH=1350
+WINDOW_HEIGHT=780
