@@ -4,25 +4,33 @@ This document is specifically written for AI coding assistants (Antigravity, Cur
 
 When a user asks:
 - *"Add a custom previewer for 3D models or audio files"*
-- *"Add another action keybinding (e.g. Git status on folder)"*
-- *"Adjust the search exclusions or category filters"*
-- *"Modify the floating window dimensions or behavior"*
+- *"Add another action keybinding (e.g. Open in Neovim, Git status)"*
+- *"Adjust the search exclusions or category filter tabs"*
+- *"Modify the frosted-glass overlay window dimensions or theme tokens"*
 
-Follow the architectural maps and recipes below. Make surgical, minimal edits without adding heavy runtime dependencies.
+Follow the architectural maps and recipes below.
 
 ---
 
 ## 1. Architectural Map
 
+`omarchy-recon` is a native **Omarchy Quickshell QML Overlay Plugin** (`recon.finder`):
+
 ```text
 omarchy-recon/
+├── manifest.json              # Plugin contract (id: recon.finder, kind: overlay)
+├── Recon.qml                  # Main entry point (PanelWindow, BorderSurface, Process engine, keyCatcher)
+├── ReconHeader.qml            # Search input display & status badge
+├── ReconTabs.qml              # Category filter chips (All, Folders, Docs, Code, PDF, Office, Images)
+├── ResultRow.qml              # Ergonomic 2-line list row delegate ([TAG], Name, Folder, Size)
+├── PreviewPane.qml            # Split preview pane with selectable TextEdit, Image preview, folder list
+├── script/
+│   └── Core.js                # Shared JS helpers (formatBytes, getTag, collapsePath, matchesTab)
 ├── bin/
-│   └── omarchy-recon          # Core script: argument parser, toggle logic, AWK parser, fzf TUI
-├── config/
-│   └── recon.conf.example     # Default user configuration template (~/.config/omarchy/recon.conf)
+│   └── omarchy-recon          # CLI wrapper forwarding calls to `omarchy-shell shell toggle recon.finder`
 ├── hypr/
-│   └── recon.lua              # Hyprland window rule (class: omarchy-recon.float) and keybinding
-├── install.sh                 # Symlinks bin/ to ~/.local/bin/ and provisions config
+│   └── recon.lua              # Hyprland bindings template
+├── install.sh                 # Symlinks plugin to ~/.config/omarchy/plugins/recon.finder and enables it
 ├── README.md                  # Human-facing user manual
 └── AGENT.md                   # This instruction file for AI agents
 ```
@@ -31,111 +39,100 @@ omarchy-recon/
 
 ## 2. Execution Pipeline
 
-Understanding the data flow is essential before editing:
-
 ```mermaid
-flowchart LR
-    A["User presses Keybinding\n(SUPER + M)"] --> B["bin/omarchy-recon"]
-    B -->|Toggle check| C{"Already open?"}
-    C -->|Yes| D["hyprctl closewindow + exit 0"]
-    C -->|No| E["exec foot (app-id: omarchy-recon.float)"]
-    E --> F["fd (Files & Dirs)"]
-    F --> G["stat --printf='%F\t%s\t%n\n'"]
-    G --> H["awk (Format 4 columns & calculate stats)"]
-    H --> I["fzf (TUI list, sticky header, multi-format preview)"]
-    I -->|Selection or Shortcut| J["xdg-open / terminal / trash / wl-copy"]
+flowchart TD
+    A["User presses SUPER + M\nor runs 'omarchy-recon'"] --> B["omarchy-shell shell toggle recon.finder"]
+    B --> C["Recon.qml (Quickshell Overlay)"]
+    C --> D["WlrLayer.Overlay with frosted-glass scrim"]
+    C --> E["searchProc (fd + stat pipeline)"]
+    E --> F["displayModel (populates ListView)"]
+    F --> G["previewProc (live head/pdftotext/ls)"]
+    G --> H["PreviewPane.qml (Selectable TextEdit / Image)"]
+    C -->|Keyboard Shortcuts| I["xdg-open / wl-copy / gio trash"]
 ```
 
 ---
 
-## 3. Variable & Configuration Dictionary
+## 3. Key Files & Responsibilities
 
-| Variable | File Location | Default | Purpose & Acceptable Values |
-| :--- | :--- | :--- | :--- |
-| `TARGET_DIR` | `bin/omarchy-recon`, `recon.conf` | `$HOME` | Root directory indexed. Overridden by CLI argument `$1`. |
-| `EXCLUDE_DIRS` | `bin/omarchy-recon`, `recon.conf` | `"DOTFILES BRAIN ..."` | Space-separated list of folder names excluded by `fd`. |
-| `INCLUDE_HIDDEN`| `bin/omarchy-recon`, `recon.conf`| `"false"` | `"false"` = skips `.*` dotfiles/dotfolders. `"true"` = indexes hidden files (`fd -H`). |
-| `INCLUDE_DIRS` | `bin/omarchy-recon`, `recon.conf`| `"true"` | `"true"` = indexes directories as `[DIR]`. `"false"` = files only. |
-| `PREVIEW_LAYOUT`| `bin/omarchy-recon`, `recon.conf`| `"down:50%:wrap"`| Layout in `fzf`. Options: `"down:50%:wrap"`, `"right:50%:wrap"`, `"hidden"`. |
-| `APP_ID` | `bin/omarchy-recon`, `recon.lua` | `"omarchy-recon.float"` | Wayland window class used by Hyprland window rules and toggle checks. |
-| `WINDOW_WIDTH` | `hypr/recon.lua` | `1350` | Floating window width in pixels. Must fit 4 columns + preview. |
-| `WINDOW_HEIGHT`| `hypr/recon.lua` | `780` | Floating window height in pixels. |
+| File | Purpose | How to Modify |
+| :--- | :--- | :--- |
+| `manifest.json` | Omarchy plugin manifest schema | Update version, plugin ID, or entry points. Must pass `omarchy plugin validate .` |
+| `Recon.qml` | Top-level Quickshell overlay, key event loop, process orchestration | Change window size (`cardWidth`, `cardHeight`), key bindings in `keyCatcher`, or background commands |
+| `ReconTabs.qml` | Category filter chips | Add new tabs to `tabsRoot.tabs` array |
+| `ResultRow.qml` | ListView row delegate | Modify column widths, font sizes, colors, or tag badge styles |
+| `PreviewPane.qml` | Split interactive preview | Customize `TextEdit` selection styling, add media player, or change headers |
+| `script/Core.js` | Business logic & formatting | Add file extensions to `getTag()`, update path collapsing |
+| `bin/omarchy-recon` | Terminal CLI launcher | Accepts optional directory argument and passes to `omarchy-shell` |
 
 ---
 
 ## 4. Customization Recipes for Agents
 
-### Recipe A: Adding or Changing File Type Tags
-**File to touch**: [`bin/omarchy-recon`](bin/omarchy-recon) (inside the inner `awk` script).
+### Recipe A: Adding a New Category Filter Chip
+1. In [`script/Core.js`](script/Core.js):
+   - Add new file extensions to `getTag(path, isDir)`:
+     ```js
+     if (/^(mp3|flac|wav|ogg|m4a)$/.test(ext)) return "AUDIO";
+     ```
+   - Update `matchesTab(tag, tab)`:
+     ```js
+     if (tab === "audio") return tag === "AUDIO";
+     ```
+2. In [`ReconTabs.qml`](ReconTabs.qml):
+   - Add the chip to `readonly property var tabs`:
+     ```qml
+     { id: "audio", label: "Audio" }
+     ```
+3. In [`Recon.qml`](Recon.qml):
+   - Add `audio` to `cycleTab`:
+     ```js
+     var tabs = ["all", "folders", "docs", "code", "pdf", "office", "images", "audio"]
+     ```
+   - Add fd filter flags inside `executeSearch()`:
+     ```js
+     else if (tab === "audio") typeFlags = "-t f -e mp3 -e flac -e wav -e ogg"
+     ```
 
-**How it works**:
-In the `awk` block, extensions are matched and assigned a bracketed `tag`, and a counter is incremented for the stats header:
+---
 
-```awk
-# Example: Adding Audio/Music category
-else if (ext ~ /^(mp3|flac|wav|ogg|m4a)$/) { tag = "[AUDIO]"; c_audio++ }
+### Recipe B: Changing Target Exclusions or Default Drive
+In [`Recon.qml`](Recon.qml):
+- Default target directory: `property string targetDir: "/run/media/hp/SSS"`
+- Excluded directories in `executeSearch()`:
+  ```js
+  fd -i --exclude DOTFILES --exclude BRAIN --exclude KUBUNTU --exclude WIN --exclude MEDIA --exclude '.Trash*' ...
+  ```
+Add any new folder to `--exclude <NAME>`.
+
+---
+
+### Recipe C: Adding a Custom Keyboard Action
+In [`Recon.qml`](Recon.qml) inside `keyCatcher.Keys.onPressed`:
+```qml
+} else if ((event.key === Qt.Key_E) && (event.modifiers & Qt.ControlModifier)) {
+  // Ctrl+E: Edit in Neovim terminal
+  var item = displayModel.get(root.selectedIndex)
+  if (item && item.path) {
+    Util.execDetached("foot -e nvim " + Util.shellQuote(item.path))
+  }
+  root.dismiss()
+  event.accepted = true
 ```
 
-Don't forget to include the counter in the `END` block of `awk`:
-```awk
-END {
-  printf "📊 %s: %d Items (... │ AUDIO: %d)\t\n", lbl, n, ..., c_audio
-}
-```
+---
 
-And add an `alt-...` keybinding in `fzf`:
+## 5. Verification Commands
+
+Always run these after modifying code:
 ```bash
---bind="alt-m:change-query([AUDIO] )"
+# 1. Validate manifest
+omarchy plugin validate /home/hp/Work/omarchy-recon
+
+# 2. Rescan and reload shell
+omarchy-shell shell rescanPlugins
+omarchy restart shell
+
+# 3. Test toggle
+omarchy-shell shell toggle recon.finder
 ```
-
----
-
-### Recipe B: Modifying the Preview Pipeline
-**File to touch**: [`bin/omarchy-recon`](bin/omarchy-recon) (the `--preview` option in `fzf`).
-
-**Current implementation**:
-- Directories: `eza --tree --level=2 --color=always` ➔ `tree -L 2` ➔ `ls -lhA`
-- Images: `chafa -s 80x25 "$f"` ➔ `file -b "$f"`
-- PDFs: `pdftotext -l 10 "$f" -`
-- Code/Text: `bat --style=numbers --color=always "$f"` ➔ `cat "$f"`
-
-**Example: Adding Audio Metadata Preview via `mediainfo` or `ffprobe`**:
-```bash
-elif [[ "$f" =~ \.(mp3|flac|wav|ogg|m4a)$ ]]; then
-  mediainfo "$f" 2>/dev/null || ffprobe -hide_banner "$f" 2>&1
-```
-
----
-
-### Recipe C: Adding New Keybindings & Actions in FZF
-**File to touch**: [`bin/omarchy-recon`](bin/omarchy-recon) (the `--bind` arguments in `fzf`).
-
-`{2}` represents the raw unescaped file path.
-
-| User Request | Action to Add |
-| :--- | :--- |
-| **Open in VSCode** | `--bind="ctrl-v:execute-silent(code {2})+abort"` |
-| **Open in Sublime Text**| `--bind="ctrl-s:execute-silent(subl {2})+abort"` |
-| **Run Executable Script**| `--bind="ctrl-r:execute({2})+abort"` |
-| **Git Status on Folder** | `--bind="ctrl-g:execute(d={2}; [[ -f \"\$d\" ]] && d=\$(dirname \"\$d\"); git -C \"\$d\" status)+abort"` |
-
-Also update `HEADER="..."` in `bin/omarchy-recon` to reflect new shortcuts.
-
----
-
-## 5. Verification Protocol for Agents
-
-Whenever making changes, an AI agent **must run these commands before reporting completion**:
-
-1. **Syntax Check**:
-   ```bash
-   bash -n bin/omarchy-recon
-   ```
-2. **Dry-Run Data Generation Check**:
-   ```bash
-   bin/omarchy-recon --help
-   ```
-3. **Hyprland Rules Check**:
-   ```bash
-   hyprctl reload
-   ```

@@ -1,256 +1,41 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# omarchy-recon: Fast floating file & directory explorer, previewer and launcher
+# omarchy-recon: Fast native frosted-glass file & directory explorer overlay
 #
-# omarchy:summary=Fast floating file search and launcher with instant preview and auto-copy
+# omarchy:summary=Fast native frosted-glass file search and launcher with instant preview and auto-copy
 # omarchy:group=file
 # omarchy:name=recon
 # omarchy:args=[path]
-# omarchy:examples=omarchy file recon|omarchy-recon /run/media/hp/SSS
+# omarchy:examples=omarchy-recon|omarchy-recon /run/media/hp/SSS
 # ==============================================================================
 set -euo pipefail
 
-APP_ID="omarchy-recon.float"
-CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/recon.conf"
+dir="${1:-}"
 
-# Default configuration
-TARGET_DIR="${HOME}"
-EXCLUDE_DIRS="DOTFILES BRAIN KUBUNTU WIN MEDIA .Trash-1000 .trash .git node_modules __pycache__ .venv"
-INCLUDE_HIDDEN="false"
-INCLUDE_DIRS="true"
-PREVIEW_LAYOUT="down:50%:wrap"
-WINDOW_WIDTH=1350
-WINDOW_HEIGHT=780
-
-# Load configuration if available
-if [[ -f "$CONFIG_FILE" ]]; then
-  # shellcheck source=/dev/null
-  source "$CONFIG_FILE"
-fi
-
-# Parse CLI arguments
-show_help() {
+if [[ "$dir" == "-h" || "$dir" == "--help" ]]; then
   cat <<'EOF'
-omarchy-recon: Fast floating file & directory search and launcher for Omarchy
+omarchy-recon: Native Omarchy frosted-glass file & directory finder overlay
 
 Usage:
-  omarchy-recon [path] [options]
-  omarchy file recon [path]
+  omarchy-recon [path]
+  omarchy-shell shell toggle recon.finder
 
-Arguments:
-  path                 Target directory to search (default: from config or $HOME)
-
-Options:
-  --exclude <dirs>     Space-separated folder names to exclude
-  --hidden             Include hidden files and folders (default: excluded)
-  --no-dirs            Exclude directories from search results
-  --preview <layout>   Initial preview layout ('down:50%:wrap', 'right:50%:wrap', 'hidden')
-  -h, --help           Show this help message
-
-Keybindings in Recon:
-  Actions:
-    [ENTER]            Open file or folder in default application
-    [CTRL+T]           Open terminal in selected item's directory
-    [CTRL+O]           Reveal item in desktop file manager
-    [CTRL+E]           Edit file in terminal editor ($EDITOR / nvim)
-    [CTRL+Y]           Copy absolute path to clipboard and exit
-    [ALT+Y]            Copy file text contents to clipboard and exit
-    [CTRL+DEL]         Safely move item to desktop trash (gio trash)
-    [CTRL+/]           Toggle preview layout (Bottom -> Right -> Hidden)
-    [PAGE UP / DOWN]   Scroll preview window
-    [ESC]              Close window immediately
-    [MOUSE SELECT]     Auto-copies selected preview text to Wayland clipboard
-
-  Category Filters:
-    [ALT+A]            All items (clear filter)
-    [ALT+F]            Folders only ([DIR])
-    [ALT+D]            Documents & Notes ([MD])
-    [ALT+C]            Source Code ([CODE])
-    [ALT+P]            PDF documents ([PDF])
-    [ALT+O]            Office files ([OFFICE])
+Shortcuts inside Recon:
+  [Enter]            Open file or folder in default application
+  [Shift+Enter]      Copy absolute path to Wayland clipboard
+  [Alt+Enter]        Reveal file in parent folder
+  [Tab / Shift+Tab]  Cycle category filter tabs (All, Folders, Docs, Code, PDF, Office, Images)
+  [Del / Ctrl+D]     Move item to trash (gio trash)
+  [Ctrl+C]           Copy file path
+  [Esc]              Clear search query / close overlay
+  [Mouse Select]     Select and copy text directly inside the preview pane
 EOF
   exit 0
-}
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -h|--help)
-      show_help
-      ;;
-    --exclude)
-      EXCLUDE_DIRS="$2"
-      shift 2
-      ;;
-    --hidden)
-      INCLUDE_HIDDEN="true"
-      shift
-      ;;
-    --no-dirs)
-      INCLUDE_DIRS="false"
-      shift
-      ;;
-    --preview)
-      PREVIEW_LAYOUT="$2"
-      shift 2
-      ;;
-    -*)
-      echo "Unknown option: $1" >&2
-      show_help
-      ;;
-    *)
-      TARGET_DIR="$1"
-      shift
-      ;;
-  esac
-done
-
-# Resolve absolute path
-if [[ ! -d "$TARGET_DIR" ]]; then
-  notify-send "Recon" "Directory not found: $TARGET_DIR" 2>/dev/null || true
-  echo "Error: Directory not found: $TARGET_DIR" >&2
-  exit 1
-fi
-TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
-LABEL="$(basename "$TARGET_DIR")"
-[[ "$TARGET_DIR" == "$HOME" ]] && LABEL="Home"
-WINDOW_TITLE="Recon: ${LABEL}"
-
-# 1. TOGGLE: If Recon window is already open, close it cleanly
-if hyprctl clients -j 2>/dev/null | grep -q '"class": "'"$APP_ID"'"' || pgrep -f "foot.*-a $APP_ID" >/dev/null 2>&1; then
-  hyprctl dispatch closewindow "class:^${APP_ID}$" >/dev/null 2>&1 || true
-  pkill -9 -f "foot.*-a $APP_ID" 2>/dev/null || true
-  exit 0
 fi
 
-# Launch foot terminal floating window
-exec foot \
-  -o main.selection-target=both \
-  -a "$APP_ID" \
-  -T "$WINDOW_TITLE" \
-  bash -c '
-    target="$1"
-    label="$2"
-    excludes_str="$3"
-    include_hidden="$4"
-    include_dirs="$5"
-    preview_layout="$6"
-
-    fd_args=(-t f)
-    if [[ "$include_dirs" == "true" ]]; then
-      fd_args+=(-t d)
-    fi
-    if [[ "$include_hidden" == "true" ]]; then
-      fd_args+=(-H)
-    fi
-
-    read -r -a exc_array <<< "$excludes_str"
-    for exc in "${exc_array[@]}"; do
-      [[ -n "$exc" ]] && fd_args+=(--exclude "$exc")
-    done
-
-    # Collect file paths and sizes in safe tab-separated stream
-    data=$(fd "${fd_args[@]}" . "$target" -X stat --printf="%F\t%s\t%n\n" 2>/dev/null | awk -F"\t" -v base="$target/" -v lbl="$label" '\''
-      function fmt_size(b) {
-        if (b >= 1048576) return sprintf("%5.1fM", b/1048576)
-        if (b >= 1024) return sprintf("%5.1fK", b/1024)
-        return sprintf("%5dB", b)
-      }
-      {
-        type = $1
-        bytes = $2
-        full = $3
-        name = full
-        sub(".*/", "", name)
-
-        if (type == "directory") {
-          tag = "[DIR]"
-          c_dir++
-          sz = "   DIR"
-        } else {
-          ext = tolower(substr(name, match(name, /\.[^.]+$/) + 1))
-          if (ext == "" || ext == name) ext = "txt"
-
-          tag = "[OTHER]"
-          if (ext == "md") { tag = "[MD]"; c_md++ }
-          else if (ext == "pdf") { tag = "[PDF]"; c_pdf++ }
-          else if (ext == "json") { tag = "[JSON]"; c_json++ }
-          else if (ext ~ /^(py|js|ts|m|sh|html|css|lua|c|cpp|rs|go)$/) { tag = "[CODE]"; c_code++ }
-          else if (ext ~ /^(docx|doc|odt|xlsx|pptx)$/) { tag = "[OFFICE]"; c_office++ }
-          else { c_other++ }
-          sz = fmt_size(bytes)
-        }
-
-        rel = full
-        sub(base, "", rel)
-        if (index(rel, "/") == 0) {
-          dir = lbl
-        } else {
-          dir = rel
-          sub("/[^/]*$", "", dir)
-        }
-        if (length(dir) > 35) dir = "..." substr(dir, length(dir)-31)
-
-        if (length(name) > 40) disp_name = substr(name, 1, 37) "..."
-        else disp_name = name
-
-        lines[++n] = sprintf("%-8s  %-40s  %-35s  %7s\t%s", tag, disp_name, dir, sz, full)
-      }
-      END {
-        printf "📊 %s: %d Items (DIR: %d │ PDF: %d │ MD: %d │ CODE: %d │ OFFICE: %d │ OTHER: %d)\t\n", lbl, n, c_dir, c_pdf, c_md, c_code, c_office, c_other
-        printf "%-8s  %-40s  %-35s  %7s\t\n", "TYPE", "FILE", "FOLDER", "SIZE"
-        for (i = 1; i <= n; i++) {
-          print lines[i]
-        }
-      }
-    '\'')
-
-    HEADER="[ENTER] Open │ [CTRL+T] Term │ [CTRL+O] Reveal │ [CTRL+E] Edit │ [CTRL+Y] Path │ [ALT+Y] Copy │ [CTRL+X] Trash │ [ESC] Close\n[ALT+A] All │ [ALT+F] Dirs │ [ALT+D] Docs │ [ALT+C] Code │ [ALT+P] PDFs │ [ALT+O] Office │ [CTRL+/] Toggle Layout"
-
-    selected=$(printf "%s\n" "$data" | fzf \
-      --delimiter="\t" \
-      --with-nth="1" \
-      --header-lines=2 \
-      --header="$HEADER" \
-      --header-first \
-      --prompt="🔍 Recon > " \
-      --reverse \
-      --no-mouse \
-      --bind="esc:abort" \
-      --bind="ctrl-y:execute-silent(printf %s {2} | wl-copy)+abort" \
-      --bind="alt-y:execute-silent(cat {2} | wl-copy)+abort" \
-      --bind="ctrl-t:execute-silent(d={2}; [[ -f \"\$d\" ]] && d=\$(dirname \"\$d\"); nohup xdg-terminal-exec --dir=\"\$d\" >/dev/null 2>&1 || nohup foot -D \"\$d\" >/dev/null 2>&1 &)+abort" \
-      --bind="ctrl-o:execute-silent(d={2}; [[ -f \"\$d\" ]] && d=\$(dirname \"\$d\"); nohup xdg-open \"\$d\" >/dev/null 2>&1 &)+abort" \
-      --bind="ctrl-e:execute(\${EDITOR:-nvim} {2})+abort" \
-      --bind="ctrl-delete,ctrl-x:execute-silent(gio trash {2} 2>/dev/null && notify-send \"Recon\" \"Moved to trash: \$(basename {2})\")+abort" \
-      --bind="ctrl-/:change-preview-window(right,50%,wrap|down,50%,wrap|hidden)" \
-      --bind="alt-a:change-query()" \
-      --bind="alt-f:change-query([DIR] )" \
-      --bind="alt-d:change-query([MD] )" \
-      --bind="alt-c:change-query([CODE] )" \
-      --bind="alt-p:change-query([PDF] )" \
-      --bind="alt-o:change-query([OFFICE] )" \
-      --bind="page-up:preview-page-up,page-down:preview-page-down" \
-      --preview='\''f={2}; \
-        if [[ -d "$f" ]]; then \
-          eza --tree --level=2 --color=always --icons=always "$f" 2>/dev/null || tree -L 2 -C "$f" 2>/dev/null || ls -lhA --color=always "$f"; \
-        elif [[ "$f" =~ \.(png|jpg|jpeg|webp|gif|svg)$ ]]; then \
-          if command -v chafa >/dev/null 2>&1; then \
-            chafa -s 80x25 "$f" 2>/dev/null; \
-          else \
-            file -b "$f"; echo ""; echo "[Install chafa for high-res terminal image preview: sudo pacman -S chafa]"; \
-          fi; \
-        elif [[ "$f" =~ \.(pdf|PDF)$ ]]; then \
-          pdftotext -l 10 "$f" - 2>/dev/null || echo "[PDF Text Unavailable]"; \
-        else \
-          bat --style=numbers --color=always "$f" 2>/dev/null || cat "$f" 2>/dev/null; \
-        fi'\'' \
-      --preview-window="$preview_layout")
-
-    if [[ -n "$selected" ]]; then
-      chosen_path=$(printf "%s" "$selected" | cut -f2)
-      if [[ -e "$chosen_path" ]]; then
-        nohup xdg-open "$chosen_path" >/dev/null 2>&1 &
-        sleep 0.1
-      fi
-    fi
-  ' _ "$TARGET_DIR" "$LABEL" "$EXCLUDE_DIRS" "$INCLUDE_HIDDEN" "$INCLUDE_DIRS" "$PREVIEW_LAYOUT"
+if [[ -n "$dir" ]]; then
+  abs_dir="$(cd "$dir" 2>/dev/null && pwd || echo "$dir")"
+  omarchy-shell shell toggle recon.finder "{\"dir\": \"$abs_dir\"}"
+else
+  omarchy-shell shell toggle recon.finder
+fi

@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# omarchy-recon Installer
+# omarchy-recon Installer (Native Quickshell QML Overlay)
 # ==============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_TARGET="${HOME}/.local/bin/omarchy-recon"
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy"
-CONFIG_FILE="${CONFIG_DIR}/recon.conf"
+PLUGIN_TARGET="${HOME}/.config/omarchy/plugins/recon.finder"
 
 echo "==> Installing omarchy-recon..."
 
 # 1. Check dependencies
-deps=(fd fzf foot bat wl-copy)
+deps=(fd wl-copy gio xdg-open)
 missing=()
 for dep in "${deps[@]}"; do
   if ! command -v "$dep" >/dev/null 2>&1; then
@@ -25,33 +24,31 @@ if [[ ${#missing[@]} -gt 0 ]]; then
   echo "Please install them via pacman: sudo pacman -S ${missing[*]}"
 fi
 
-# Optional dependency check
 if ! command -v pdftotext >/dev/null 2>&1; then
-  echo "Note: 'pdftotext' (poppler) is optional but recommended for PDF previews."
+  echo "Note: 'pdftotext' (poppler) is recommended for live PDF previews."
 fi
 
-# 2. Link executable
+# 2. Register native Omarchy plugin
+mkdir -p "${HOME}/.config/omarchy/plugins"
+ln -sfn "${SCRIPT_DIR}" "${PLUGIN_TARGET}"
+echo "  [OK] Linked plugin: ${PLUGIN_TARGET} -> ${SCRIPT_DIR}"
+
+if command -v omarchy >/dev/null 2>&1; then
+  omarchy plugin enable recon.finder 2>/dev/null || true
+  omarchy-shell shell rescanPlugins 2>/dev/null || true
+  echo "  [OK] Enabled plugin 'recon.finder' in Omarchy"
+fi
+
+# 3. Link executable CLI helper
 mkdir -p "${HOME}/.local/bin"
 ln -sf "${SCRIPT_DIR}/bin/omarchy-recon" "$BIN_TARGET"
 chmod +x "$BIN_TARGET"
-echo "  [OK] Linked ${BIN_TARGET} -> ${SCRIPT_DIR}/bin/omarchy-recon"
+echo "  [OK] Linked CLI: ${BIN_TARGET}"
 
-# 3. Create default config if not present
-mkdir -p "$CONFIG_DIR"
-if [[ ! -f "$CONFIG_FILE" ]]; then
-  cp "${SCRIPT_DIR}/config/recon.conf.example" "$CONFIG_FILE"
-  echo "  [OK] Created default config at ${CONFIG_FILE}"
-else
-  echo "  [INFO] Existing config preserved at ${CONFIG_FILE}"
-fi
-
-# 4. Instructions for Hyprland keybinding
 echo ""
 echo "==> Installation complete!"
 echo ""
-echo "To enable the floating window rule and keybinding, add this to your ~/.config/hypr/bindings.lua:"
-echo ""
-echo "  o.window(\"omarchy-recon.float\", { float = true, center = true, size = { 1350, 780 } })"
-echo "  o.bind(\"SUPER + M\", \"Recon File Search\", \"omarchy-recon\")"
+echo "Add this to your ~/.config/hypr/bindings.lua:"
+echo "  o.bind(\"SUPER + M\", \"File Search (Recon)\", \"omarchy-shell shell toggle recon.finder\")"
 echo ""
 echo "Then reload Hyprland: hyprctl reload"

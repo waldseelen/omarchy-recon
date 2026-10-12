@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "recon.finder",
+  "name": "Omarchy Recon",
+  "version": "1.0.0",
+  "author": "hp",
+  "description": "Fast native frosted-glass file & directory finder with live previews and keyboard actions",
+  "kinds": ["overlay"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "overlay": "Recon.qml"
+  }
+}
