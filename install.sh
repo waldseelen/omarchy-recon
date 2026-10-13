@@ -21,7 +21,7 @@ done
 
 if [[ ${#missing[@]} -gt 0 ]]; then
   echo "Warning: The following dependencies are missing: ${missing[*]}"
-  echo "Please install them via pacman: sudo pacman -S ${missing[*]}"
+  echo "Please install them via pacman: pacman -S ${missing[*]}"
 fi
 
 if ! command -v pdftotext >/dev/null 2>&1; then

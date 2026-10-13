@@ -210,7 +210,7 @@ Frecency history is maintained in `~/.config/omarchy/recon_frecency.json`.
 ### Prerequisites
 Make sure the following lightweight utilities are available on Arch Linux / Omarchy:
 ```bash
-sudo pacman -S --needed fd ripgrep wl-clipboard glib2 xdg-utils poppler
+pacman -S --needed fd ripgrep wl-clipboard glib2 xdg-utils poppler
 ```
 
 ### Installation
