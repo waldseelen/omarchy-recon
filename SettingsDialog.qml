@@ -10,6 +10,8 @@ Rectangle {
   anchors.fill: parent
   color: Util.alpha(Color.menu.scrim, 0.75)
   z: 50
+  focus: true
+  Keys.priority: Keys.BeforeItem
 
   property string targetDir: "/run/media/hp/SSS"
   property var excludeDirs: []
@@ -25,6 +27,35 @@ Rectangle {
   property var localDirs: []
   property var localExts: []
   property bool localHidden: excludeHidden
+
+  Keys.onPressed: function(event) {
+    if (event.key === Qt.Key_Escape || event.key === Qt.Key_F10) {
+      settingsOverlay.closed()
+      event.accepted = true
+      return
+    }
+    if ((event.key === Qt.Key_Comma && (event.modifiers & Qt.ControlModifier)) ||
+        (event.key === Qt.Key_S && (event.modifiers & Qt.AltModifier))) {
+      settingsOverlay.closed()
+      event.accepted = true
+      return
+    }
+    if (((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && (event.modifiers & Qt.ControlModifier)) ||
+        ((event.key === Qt.Key_S) && (event.modifiers & Qt.ControlModifier))) {
+      settingsOverlay.saveAndClose()
+      event.accepted = true
+      return
+    }
+    if ((event.key === Qt.Key_R) && (event.modifiers & Qt.ControlModifier)) {
+      settingsOverlay.applyDefaults()
+      event.accepted = true
+      return
+    }
+  }
+
+  function initFocus() {
+    folderInput.forceActiveFocus()
+  }
 
   Component.onCompleted: {
     resetToCurrent()
@@ -93,8 +124,8 @@ Rectangle {
 
   BorderSurface {
     id: dialogCard
-    width: Math.min(Style.space(800), parent.width - Style.space(40))
-    height: Math.min(Style.space(560), parent.height - Style.space(40))
+    width: Math.min(Style.space(820), parent.width - Style.space(40))
+    height: Math.min(Style.space(580), parent.height - Style.space(40))
     radius: Style.cornerRadius
     anchors.centerIn: parent
     color: Color.menu.background
@@ -107,13 +138,20 @@ Rectangle {
       onClicked: {}
     }
 
-    Column {
+    Item {
+      id: dialogContent
       anchors.fill: parent
-      spacing: Style.space(12)
+      anchors.topMargin: dialogCard.contentTopInset
+      anchors.bottomMargin: dialogCard.contentBottomInset
+      anchors.leftMargin: dialogCard.contentLeftInset
+      anchors.rightMargin: dialogCard.contentRightInset
 
-      // Header Bar
+      // 1. Header Bar
       Rectangle {
-        width: parent.width
+        id: headerBar
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
         height: Style.space(34)
         color: "transparent"
 
@@ -152,18 +190,216 @@ Rectangle {
         }
       }
 
-      // Divider
+      // Divider below Header
       Rectangle {
-        width: parent.width
+        id: headerDivider
+        anchors.top: headerBar.bottom
+        anchors.topMargin: Style.space(6)
+        anchors.left: parent.left
+        anchors.right: parent.right
         height: 1
         color: Util.alpha(Color.menu.border, 0.3)
       }
 
-      // Scrollable Settings Content
+      // 2. Bottom Action Buttons (Anchored cleanly at bottom)
+      Item {
+        id: footerBar
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: Style.space(36)
+
+        // Left Action: Reset Defaults
+        Rectangle {
+          id: resetBtn
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          width: resetText.implicitWidth + Style.space(24)
+          height: parent.height
+          radius: Style.cornerRadius
+          color: resetBtn.activeFocus || resetMouse.containsMouse ? Util.alpha(Color.menu.border, 0.4) : Util.alpha(Color.menu.border, 0.2)
+          border.width: resetBtn.activeFocus ? 2 : 1
+          border.color: resetBtn.activeFocus ? Color.accent : Util.alpha(Color.menu.border, 0.4)
+          activeFocusOnTab: true
+          KeyNavigation.tab: cancelBtn
+          KeyNavigation.backtab: extInput
+
+          Keys.onPressed: function(event) {
+            if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+              settingsOverlay.applyDefaults()
+              event.accepted = true
+            }
+          }
+
+          Text {
+            id: resetText
+            anchors.centerIn: parent
+            text: "Reset Defaults"
+            color: Color.menu.text
+            opacity: 0.85
+            font.family: settingsOverlay.fontFamily
+            font.pixelSize: Style.space(11)
+          }
+
+          MouseArea {
+            id: resetMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: settingsOverlay.applyDefaults()
+          }
+        }
+
+        // Right Actions: Cancel & Save
+        Row {
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          spacing: Style.space(10)
+
+          Rectangle {
+            id: cancelBtn
+            width: cancelText.implicitWidth + Style.space(24)
+            height: footerBar.height
+            radius: Style.cornerRadius
+            color: cancelBtn.activeFocus || cancelMouse.containsMouse ? Util.alpha(Color.menu.border, 0.4) : Util.alpha(Color.menu.border, 0.2)
+            border.width: cancelBtn.activeFocus ? 2 : 1
+            border.color: cancelBtn.activeFocus ? Color.accent : Util.alpha(Color.menu.border, 0.4)
+            activeFocusOnTab: true
+            KeyNavigation.tab: saveBtn
+            KeyNavigation.backtab: resetBtn
+
+            Keys.onPressed: function(event) {
+              if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                settingsOverlay.closed()
+                event.accepted = true
+              }
+            }
+
+            Text {
+              id: cancelText
+              anchors.centerIn: parent
+              text: "Cancel"
+              color: Color.menu.text
+              opacity: 0.85
+              font.family: settingsOverlay.fontFamily
+              font.pixelSize: Style.space(11)
+            }
+
+            MouseArea {
+              id: cancelMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: settingsOverlay.closed()
+            }
+          }
+
+          Rectangle {
+            id: saveBtn
+            width: saveText.implicitWidth + Style.space(28)
+            height: footerBar.height
+            radius: Style.cornerRadius
+            color: saveBtn.activeFocus || saveMouse.containsMouse ? Color.menu.selectedBackground : Util.alpha(Color.menu.selectedBackground, 0.85)
+            border.width: saveBtn.activeFocus ? 2 : 1
+            border.color: saveBtn.activeFocus ? Color.accent : Color.menu.selectedBorder
+            activeFocusOnTab: true
+            KeyNavigation.tab: targetInput
+            KeyNavigation.backtab: cancelBtn
+
+            Keys.onPressed: function(event) {
+              if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                settingsOverlay.saveAndClose()
+                event.accepted = true
+              }
+            }
+
+            Text {
+              id: saveText
+              anchors.centerIn: parent
+              text: "Save & Apply"
+              color: Color.menu.selectedText
+              font.family: settingsOverlay.fontFamily
+              font.pixelSize: Style.space(11)
+              font.weight: Font.Bold
+            }
+
+            MouseArea {
+              id: saveMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: settingsOverlay.saveAndClose()
+            }
+          }
+        }
+      }
+
+      // 3. Ergonomic Keyboard Shortcuts Bar
+      Row {
+        id: hintsBar
+        anchors.bottom: footerBar.top
+        anchors.bottomMargin: Style.space(8)
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: Style.space(18)
+        spacing: Style.space(12)
+        opacity: 0.75
+
+        Repeater {
+          model: [
+            { key: "↵ Enter", desc: "Add Exclusion" },
+            { key: "⌫ Backspace", desc: "Remove Last" },
+            { key: "Tab", desc: "Next Field" },
+            { key: "^↵ / ^S", desc: "Save & Apply" },
+            { key: "Esc", desc: "Cancel" }
+          ]
+
+          delegate: Row {
+            required property var modelData
+            spacing: Style.space(4)
+
+            Rectangle {
+              anchors.verticalCenter: parent.verticalCenter
+              width: kHintKey.implicitWidth + Style.space(8)
+              height: Style.space(16)
+              radius: Style.space(3)
+              color: Util.alpha(Color.menu.selectedBackground, 0.25)
+              border.width: 1
+              border.color: Util.alpha(Color.menu.border, 0.4)
+
+              Text {
+                id: kHintKey
+                anchors.centerIn: parent
+                text: modelData.key
+                color: Color.menu.selectedText
+                font.family: settingsOverlay.fontFamily
+                font.pixelSize: Style.space(9)
+                font.weight: Font.Bold
+              }
+            }
+
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              text: modelData.desc
+              color: Color.menu.text
+              font.family: settingsOverlay.fontFamily
+              font.pixelSize: Style.space(10)
+            }
+          }
+        }
+      }
+
+      // 4. Scrollable Settings Content (Anchored between Divider and HintsBar)
       Flickable {
-        width: parent.width
-        height: parent.height - Style.space(34 + 1 + 12 + 36 + 12)
+        id: settingsFlickable
+        anchors.top: headerDivider.bottom
+        anchors.topMargin: Style.space(10)
+        anchors.bottom: hintsBar.top
+        anchors.bottomMargin: Style.space(10)
+        anchors.left: parent.left
+        anchors.right: parent.right
         contentHeight: settingsContent.implicitHeight
+        contentWidth: width
         clip: true
         boundsBehavior: Flickable.StopAtBounds
 
@@ -172,7 +408,7 @@ Rectangle {
           width: parent.width
           spacing: Style.space(14)
 
-          // 1. Target Directory
+          // SECTION 1: Target Directory
           Column {
             width: parent.width
             spacing: Style.space(6)
@@ -194,8 +430,8 @@ Rectangle {
                 height: Style.space(32)
                 radius: Style.cornerRadius
                 color: Util.alpha(Color.menu.selectedBackground, 0.15)
-                border.width: 1
-                border.color: Util.alpha(Color.menu.border, 0.4)
+                border.width: targetInput.activeFocus ? 2 : 1
+                border.color: targetInput.activeFocus ? Color.accent : Util.alpha(Color.menu.border, 0.4)
 
                 TextInput {
                   id: targetInput
@@ -208,7 +444,11 @@ Rectangle {
                   font.family: settingsOverlay.fontFamily
                   font.pixelSize: Style.space(12)
                   clip: true
+                  activeFocusOnTab: true
+                  KeyNavigation.tab: folderInput
+                  KeyNavigation.backtab: saveBtn
                   onTextChanged: settingsOverlay.localTargetDir = text
+                  Keys.onReturnPressed: folderInput.forceActiveFocus()
                 }
               }
 
@@ -260,7 +500,7 @@ Rectangle {
             }
           }
 
-          // 2. Excluded Directories
+          // SECTION 2: Excluded Directories
           Column {
             width: parent.width
             spacing: Style.space(6)
@@ -333,8 +573,8 @@ Rectangle {
                 height: Style.space(30)
                 radius: Style.cornerRadius
                 color: Util.alpha(Color.menu.selectedBackground, 0.15)
-                border.width: 1
-                border.color: Util.alpha(Color.menu.border, 0.4)
+                border.width: folderInput.activeFocus ? 2 : 1
+                border.color: folderInput.activeFocus ? Color.accent : Util.alpha(Color.menu.border, 0.4)
 
                 TextInput {
                   id: folderInput
@@ -346,6 +586,9 @@ Rectangle {
                   font.family: settingsOverlay.fontFamily
                   font.pixelSize: Style.space(11)
                   clip: true
+                  activeFocusOnTab: true
+                  KeyNavigation.tab: hiddenCheckArea
+                  KeyNavigation.backtab: targetInput
 
                   Text {
                     anchors.fill: parent
@@ -361,6 +604,13 @@ Rectangle {
                   Keys.onReturnPressed: {
                     settingsOverlay.addFolder(folderInput.text)
                     folderInput.text = ""
+                  }
+
+                  Keys.onPressed: function(event) {
+                    if (event.key === Qt.Key_Backspace && folderInput.text === "" && settingsOverlay.localDirs.length > 0) {
+                      settingsOverlay.removeFolder(settingsOverlay.localDirs.length - 1)
+                      event.accepted = true
+                    }
                   }
                 }
               }
@@ -392,12 +642,25 @@ Rectangle {
               }
             }
 
-            // Hidden dot-folders toggle on dedicated line (ZERO overflow)
+            // Dedicated Hidden dot-folders toggle (Zero overflow)
             Rectangle {
+              id: hiddenCheckArea
               height: Style.space(26)
               width: checkRow.implicitWidth + Style.space(12)
               radius: Style.cornerRadius
-              color: "transparent"
+              color: hiddenCheckArea.activeFocus ? Util.alpha(Color.menu.selectedBackground, 0.2) : "transparent"
+              border.width: hiddenCheckArea.activeFocus ? 1 : 0
+              border.color: Color.accent
+              activeFocusOnTab: true
+              KeyNavigation.tab: extInput
+              KeyNavigation.backtab: folderInput
+
+              Keys.onPressed: function(event) {
+                if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                  settingsOverlay.localHidden = !settingsOverlay.localHidden
+                  event.accepted = true
+                }
+              }
 
               Row {
                 id: checkRow
@@ -441,7 +704,7 @@ Rectangle {
             }
           }
 
-          // 3. Excluded File Extensions
+          // SECTION 3: Excluded File Extensions
           Column {
             width: parent.width
             spacing: Style.space(6)
@@ -514,8 +777,8 @@ Rectangle {
                 height: Style.space(30)
                 radius: Style.cornerRadius
                 color: Util.alpha(Color.menu.selectedBackground, 0.15)
-                border.width: 1
-                border.color: Util.alpha(Color.menu.border, 0.4)
+                border.width: extInput.activeFocus ? 2 : 1
+                border.color: extInput.activeFocus ? Color.accent : Util.alpha(Color.menu.border, 0.4)
 
                 TextInput {
                   id: extInput
@@ -527,6 +790,9 @@ Rectangle {
                   font.family: settingsOverlay.fontFamily
                   font.pixelSize: Style.space(11)
                   clip: true
+                  activeFocusOnTab: true
+                  KeyNavigation.tab: resetBtn
+                  KeyNavigation.backtab: hiddenCheckArea
 
                   Text {
                     anchors.fill: parent
@@ -542,6 +808,13 @@ Rectangle {
                   Keys.onReturnPressed: {
                     settingsOverlay.addExt(extInput.text)
                     extInput.text = ""
+                  }
+
+                  Keys.onPressed: function(event) {
+                    if (event.key === Qt.Key_Backspace && extInput.text === "" && settingsOverlay.localExts.length > 0) {
+                      settingsOverlay.removeExt(settingsOverlay.localExts.length - 1)
+                      event.accepted = true
+                    }
                   }
                 }
               }
@@ -571,103 +844,6 @@ Rectangle {
                   }
                 }
               }
-            }
-          }
-        }
-      }
-
-      // Footer Action Buttons (Anchored Layout - Zero Overflow)
-      Item {
-        width: parent.width
-        height: Style.space(36)
-
-        // Left Action: Reset
-        Rectangle {
-          anchors.left: parent.left
-          anchors.verticalCenter: parent.verticalCenter
-          width: resetText.implicitWidth + Style.space(24)
-          height: parent.height
-          radius: Style.cornerRadius
-          color: resetMouse.containsMouse ? Util.alpha(Color.menu.border, 0.4) : Util.alpha(Color.menu.border, 0.2)
-          border.width: 1
-          border.color: Util.alpha(Color.menu.border, 0.4)
-
-          Text {
-            id: resetText
-            anchors.centerIn: parent
-            text: "Reset Defaults"
-            color: Color.menu.text
-            opacity: 0.8
-            font.family: settingsOverlay.fontFamily
-            font.pixelSize: Style.space(11)
-          }
-
-          MouseArea {
-            id: resetMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: settingsOverlay.applyDefaults()
-          }
-        }
-
-        // Right Actions: Cancel & Save
-        Row {
-          anchors.right: parent.right
-          anchors.verticalCenter: parent.verticalCenter
-          spacing: Style.space(10)
-
-          Rectangle {
-            width: cancelText.implicitWidth + Style.space(24)
-            height: parent.parent.height
-            radius: Style.cornerRadius
-            color: cancelMouse.containsMouse ? Util.alpha(Color.menu.border, 0.4) : Util.alpha(Color.menu.border, 0.2)
-            border.width: 1
-            border.color: Util.alpha(Color.menu.border, 0.4)
-
-            Text {
-              id: cancelText
-              anchors.centerIn: parent
-              text: "Cancel"
-              color: Color.menu.text
-              opacity: 0.85
-              font.family: settingsOverlay.fontFamily
-              font.pixelSize: Style.space(11)
-            }
-
-            MouseArea {
-              id: cancelMouse
-              anchors.fill: parent
-              hoverEnabled: true
-              cursorShape: Qt.PointingHandCursor
-              onClicked: settingsOverlay.closed()
-            }
-          }
-
-          Rectangle {
-            width: saveText.implicitWidth + Style.space(28)
-            height: parent.parent.height
-            radius: Style.cornerRadius
-            color: saveMouse.containsMouse ? Color.menu.selectedBackground : Util.alpha(Color.menu.selectedBackground, 0.85)
-            border.width: 1
-            border.color: Color.menu.selectedBorder
-
-            Text {
-              id: saveText
-              anchors.centerIn: parent
-              text: "Save & Apply"
-              color: Color.menu.selectedText
-              font.family: settingsOverlay.fontFamily
-              font.pixelSize: Style.space(11)
-              font.weight: Font.Bold
-            }
-
-            MouseArea {
-              id: saveMouse
-              anchors.fill: parent
-              hoverEnabled: true
-              cursorShape: Qt.PointingHandCursor
-              onClicked: settingsOverlay.saveAndClose()
             }
           }
         }

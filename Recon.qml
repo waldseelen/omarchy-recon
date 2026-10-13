@@ -30,6 +30,14 @@ Item {
   property var excludeExts: ["tmp", "bak", "log", "iso", "bin"]
   property bool excludeHidden: true
 
+  onSettingsOpenChanged: {
+    if (root.settingsOpen) {
+      Qt.callLater(function() { settingsDialog.initFocus() })
+    } else {
+      Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    }
+  }
+
   // Preview state
   property string previewContent: ""
   property string previewPath: ""
@@ -176,6 +184,29 @@ Item {
     if (idx === -1) idx = 0
     var nextIdx = (idx + delta + tabs.length) % tabs.length
     root.setActiveTab(tabs[nextIdx])
+  }
+
+  function setTabByIndex(index) {
+    var tabs = ["all", "folders", "docs", "code", "office", "images"]
+    if (index >= 0 && index < tabs.length) {
+      root.setActiveTab(tabs[index])
+    }
+  }
+
+  function cycleSubFilter(delta) {
+    var list = tabsRow ? tabsRow.currentSubFilters : []
+    if (!list || list.length === 0) return
+    var cur = root.activeSubFilter
+    var idx = -1
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === cur) {
+        idx = i
+        break
+      }
+    }
+    if (idx === -1) idx = 0
+    var nextIdx = (idx + delta + list.length) % list.length
+    root.setActiveSubFilter(list[nextIdx].id)
   }
 
   function select(delta) {
@@ -490,19 +521,56 @@ Item {
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: function(event) {
           if (root.settingsOpen) {
-            if (event.key === Qt.Key_Escape) {
+            if (event.key === Qt.Key_Escape || event.key === Qt.Key_F10 ||
+                ((event.key === Qt.Key_Comma) && (event.modifiers & Qt.ControlModifier)) ||
+                ((event.key === Qt.Key_S) && (event.modifiers & Qt.ControlModifier))) {
               root.settingsOpen = false
               event.accepted = true
             }
             return
           }
 
+          // Open / Toggle Settings Dialog
+          if (event.key === Qt.Key_F10 || event.key === Qt.Key_F1 ||
+              ((event.key === Qt.Key_Comma) && (event.modifiers & Qt.ControlModifier)) ||
+              ((event.key === Qt.Key_S) && (event.modifiers & Qt.ControlModifier)) ||
+              ((event.key === Qt.Key_S) && (event.modifiers & Qt.AltModifier))) {
+            root.settingsOpen = true
+            event.accepted = true
+            return
+          }
+
+          // Direct category switch: Alt+1 to Alt+6
+          if (event.modifiers & Qt.AltModifier) {
+            if (event.key >= Qt.Key_1 && event.key <= Qt.Key_6) {
+              root.setTabByIndex(event.key - Qt.Key_1)
+              event.accepted = true
+              return
+            }
+          }
+
+          // Sub-filter cycling: Ctrl+Tab, Ctrl+Right, Ctrl+Left, Alt+Right, Alt+Left
+          if ((event.key === Qt.Key_Tab || event.key === Qt.Key_Right) && (event.modifiers & Qt.ControlModifier)) {
+            root.cycleSubFilter(event.modifiers & Qt.ShiftModifier ? -1 : 1)
+            event.accepted = true
+            return
+          } else if ((event.key === Qt.Key_Backtab || event.key === Qt.Key_Left) && (event.modifiers & Qt.ControlModifier)) {
+            root.cycleSubFilter(-1)
+            event.accepted = true
+            return
+          } else if ((event.key === Qt.Key_Right) && (event.modifiers & Qt.AltModifier)) {
+            root.cycleSubFilter(1)
+            event.accepted = true
+            return
+          } else if ((event.key === Qt.Key_Left) && (event.modifiers & Qt.AltModifier)) {
+            root.cycleSubFilter(-1)
+            event.accepted = true
+            return
+          }
+
           if (event.key === Qt.Key_Escape) {
             if (root.filterText) root.setFilter("")
             else root.dismiss()
-            event.accepted = true
-          } else if ((event.key === Qt.Key_Comma) && (event.modifiers & Qt.ControlModifier)) {
-            root.settingsOpen = !root.settingsOpen
             event.accepted = true
           } else if (event.key === Qt.Key_Tab) {
             root.cycleTab(event.modifiers & Qt.ShiftModifier ? -1 : 1)
@@ -684,10 +752,11 @@ Item {
             Repeater {
               model: [
                 { key: "↵ Enter", desc: "Open" },
-                { key: "⇧ Shift+Enter", desc: "Copy Path" },
-                { key: "⎇ Alt+Enter", desc: "Folder" },
+                { key: "⇧Enter", desc: "Copy Path" },
+                { key: "⎇Enter", desc: "Folder" },
                 { key: "Tab", desc: "Category" },
-                { key: "^,", desc: "Settings" },
+                { key: "^Tab / ^→", desc: "Sub-filter" },
+                { key: "F10 / ^S", desc: "Settings" },
                 { key: "Del / ^D", desc: "Trash" },
                 { key: "Esc", desc: "Close" }
               ]
@@ -733,12 +802,16 @@ Item {
 
       // Settings Modal Dialog Overlay
       SettingsDialog {
+        id: settingsDialog
         visible: root.settingsOpen
         targetDir: root.targetDir
         excludeDirs: root.excludeDirs
         excludeExts: root.excludeExts
         excludeHidden: root.excludeHidden
-        onClosed: root.settingsOpen = false
+        onClosed: {
+          root.settingsOpen = false
+          Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+        }
         onSaved: function(newTarget, newDirs, newExts, newHidden) {
           root.targetDir = newTarget
           root.excludeDirs = newDirs
@@ -747,6 +820,7 @@ Item {
           root.saveConfig()
           root.settingsOpen = false
           root.executeSearch()
+          Qt.callLater(function() { keyCatcher.forceActiveFocus() })
         }
       }
     }
