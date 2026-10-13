@@ -107,6 +107,11 @@ Filter large file sets across two synchronized layers:
 
 ### ⚙️ Persistent Settings & Exclusion Manager
 A native modal dialog allows live customization of indexing boundaries:
+
+<p align="center">
+  <img src="settings-preview.png" alt="Omarchy Recon Settings & Exclusions Modal" width="95%">
+</p>
+
 - **Search Target Directory**: Editable text input with instant shortcut buttons for SSS drive and User Home.
 - **Excluded Directories**: Visual interactive chip tags (`📁 DOTFILES`, `📁 BRAIN`, `📁 node_modules`, `📁 .git`, etc.).
 - **Excluded File Extensions**: Filter out build artifacts or temporary files (`.tmp`, `.bak`, `.log`, `.iso`, etc.).
