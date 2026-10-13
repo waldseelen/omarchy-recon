@@ -217,34 +217,19 @@ Frecency history is maintained in `~/.config/omarchy/recon_frecency.json`.
 ## 6. Installation & Verification
 
 ### Prerequisites
-Make sure the following lightweight utilities are available on Arch Linux / Omarchy:
-```bash
-pacman -S --needed fd ripgrep wl-clipboard glib2 xdg-utils poppler
-```
+Omarchy Recon relies on the following standard utilities:
+- `fd` — Asynchronous filesystem traversal
+- `ripgrep` (`rg`) — High-performance in-file content search
+- `wl-clipboard` (`wl-copy`) — Wayland clipboard integration
+- `glib2` (`gio trash`) — Safe file trashing
+- `xdg-utils` (`xdg-open`) — Default application launcher
+- `poppler` (`pdftotext`) — Optional text extraction for PDF live previews
 
 ### Installation
-Clone the repository directly into your user-owned Omarchy plugins directory:
+Install and enable Recon directly using the standard Omarchy plugin manager:
 ```bash
-git clone https://github.com/waldseelen/omarchy-recon.git ~/.config/omarchy/plugins/waldseelen.recon
-```
-
-Validate and enable the plugin in the Omarchy Quattro shell:
-```bash
-# Validate manifest schema compliance
-omarchy plugin validate ~/.config/omarchy/plugins/waldseelen.recon
-
-# Rescan and enable
-omarchy-shell shell rescanPlugins
-omarchy plugin enable waldseelen.recon
+omarchy plugin add https://github.com/waldseelen/omarchy-recon.git --enable
 omarchy restart shell
-```
-
-### Optional CLI Helper
-To summon Recon from anywhere in the terminal or scripts:
-```bash
-mkdir -p ~/.local/bin
-ln -sf ~/.config/omarchy/plugins/waldseelen.recon/bin/omarchy-recon ~/.local/bin/omarchy-recon
-chmod +x ~/.local/bin/omarchy-recon
 ```
 
 ### Hyprland Keybinding
@@ -257,24 +242,24 @@ Then reload Hyprland:
 hyprctl reload
 ```
 
+### Optional CLI Helper
+To summon Recon from anywhere in the terminal or scripts:
+```bash
+mkdir -p ~/.local/bin
+ln -sf ~/.config/omarchy/plugins/waldseelen.recon/bin/omarchy-recon ~/.local/bin/omarchy-recon
+chmod +x ~/.local/bin/omarchy-recon
+```
+
 ---
 
 ## 7. Safe Removal (Uninstall)
 
-To cleanly disable and remove the plugin without touching any system packages:
+To cleanly disable and remove the plugin from Omarchy:
 ```bash
-# 1. Disable the plugin
-omarchy plugin disable waldseelen.recon
-
-# 2. Remove the plugin directory
-rm -rf ~/.config/omarchy/plugins/waldseelen.recon
-rm -f ~/.local/bin/omarchy-recon
-
-# 3. Rescan shell
-omarchy-shell shell rescanPlugins
+omarchy plugin remove waldseelen.recon
 omarchy restart shell
 ```
-(Optional) Remove the `SUPER + M` binding from `~/.config/hypr/bindings.lua` and run `hyprctl reload`.
+(Optional) Remove `SUPER + M` from `~/.config/hypr/bindings.lua` and delete `~/.local/bin/omarchy-recon`.
 
 ---
 

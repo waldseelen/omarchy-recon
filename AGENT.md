@@ -30,7 +30,6 @@ omarchy-recon/
 │   └── omarchy-recon          # CLI wrapper forwarding calls to `omarchy-shell shell toggle waldseelen.recon`
 ├── hypr/
 │   └── recon.lua              # Hyprland bindings template
-├── install.sh                 # Symlinks plugin to ~/.config/omarchy/plugins/waldseelen.recon and enables it
 ├── README.md                  # Human-facing user manual
 └── AGENT.md                   # This instruction file for AI agents
 ```
