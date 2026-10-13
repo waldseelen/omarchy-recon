@@ -6,12 +6,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_TARGET="${HOME}/.local/bin/omarchy-recon"
-PLUGIN_TARGET="${HOME}/.config/omarchy/plugins/recon.finder"
+PLUGIN_TARGET="${HOME}/.config/omarchy/plugins/waldseelen.recon"
 
-echo "==> Installing omarchy-recon..."
+echo "==> Installing omarchy-recon (waldseelen.recon)..."
 
 # 1. Check dependencies
-deps=(fd wl-copy gio xdg-open)
+deps=(fd rg wl-copy gio xdg-open)
 missing=()
 for dep in "${deps[@]}"; do
   if ! command -v "$dep" >/dev/null 2>&1; then
@@ -34,9 +34,9 @@ ln -sfn "${SCRIPT_DIR}" "${PLUGIN_TARGET}"
 echo "  [OK] Linked plugin: ${PLUGIN_TARGET} -> ${SCRIPT_DIR}"
 
 if command -v omarchy >/dev/null 2>&1; then
-  omarchy plugin enable recon.finder 2>/dev/null || true
   omarchy-shell shell rescanPlugins 2>/dev/null || true
-  echo "  [OK] Enabled plugin 'recon.finder' in Omarchy"
+  omarchy plugin enable waldseelen.recon 2>/dev/null || true
+  echo "  [OK] Enabled plugin 'waldseelen.recon' in Omarchy"
 fi
 
 # 3. Link executable CLI helper
@@ -49,6 +49,6 @@ echo ""
 echo "==> Installation complete!"
 echo ""
 echo "Add this to your ~/.config/hypr/bindings.lua:"
-echo "  o.bind(\"SUPER + M\", \"File Search (Recon)\", \"omarchy-shell shell toggle recon.finder\")"
+echo "  o.bind(\"SUPER + M\", \"File Search (Recon)\", \"omarchy-shell shell toggle waldseelen.recon\")"
 echo ""
 echo "Then reload Hyprland: hyprctl reload"

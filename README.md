@@ -1,13 +1,17 @@
-# Omarchy Recon
+# Omarchy Recon (`waldseelen.recon`)
 
-> **Native QML File & Directory Finder Overlay for Omarchy / Hyprland (Wayland)**  
-> High-performance desktop search, live document/code previewer, in-file ripgrep search, and desktop command center engineered natively with Quickshell QML and Wayland Layer-Shell protocols.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Omarchy Plugin](https://img.shields.io/badge/Omarchy-Quattro%20Plugin-orange.svg)](https://github.com/waldseelen/omarchy-recon)
+[![Version](https://img.shields.io/badge/Version-2.0.0-green.svg)](manifest.json)
+
+> **Native Frosted-Glass File & Directory Finder Overlay for Omarchy / Hyprland (Wayland)**  
+> High-performance desktop search, live document/code previewer, in-file ripgrep search, power action popover, and desktop command center engineered natively with Quickshell QML and Wayland Layer-Shell protocols.
 
 ---
 
 ## 1. System Overview & Architecture
 
-**Omarchy Recon** is built specifically for Arch Linux and Omarchy Wayland environments. It integrates directly into the `omarchy-shell` runtime as a first-class plugin, eliminating the overhead and latency of external Electron, GTK, or heavyweight search daemons.
+**Omarchy Recon** is built specifically for Arch Linux and Omarchy Wayland environments. It integrates directly into the `omarchy-shell` runtime as a native overlay plugin (`waldseelen.recon`), eliminating the overhead and latency of external Electron, GTK, or heavyweight search daemons.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -34,17 +38,21 @@
        └─────────────────────────────────────────┘
 ```
 
-- **Runtime**: Quickshell (Qt 6 / QML declarative engine).
+- **Plugin ID**: `waldseelen.recon`
+- **Runtime**: Quickshell (Qt 6 / QML declarative engine) on Quattro shell.
 - **Surface Protocol**: `WlrLayershell` overlay layer with `WlrKeyboardFocus.Exclusive` and dynamic animated scrim.
-- **IPC Architecture**: Controlled via Unix socket IPC (`omarchy-shell shell toggle recon.finder`) and CLI wrapper `omarchy-recon`.
+- **IPC Architecture**: Controlled via Unix socket IPC (`omarchy-shell shell toggle waldseelen.recon`) and CLI wrapper `omarchy-recon`.
 - **Styling**: 100% native Omarchy theme integration using `qs.Commons` and `qs.Ui` design tokens (`Color.menu`, `BorderSurface`, `Style.space`, `Style.cornerRadius`).
+
+> [!NOTE]
+> Plugins share the long-running Omarchy shell process and run unsandboxed with your user permissions. `omarchy-recon` uses standard non-elevated utilities (`fd`, `rg`, `gio trash`, `xdg-open`, `wl-copy`).
 
 ---
 
 ## 2. Core Capabilities
 
 ### 🔍 Target Search & Typo-Tolerant Fuzzy Engine
-- **Target Drive Focus**: Configured to search any directory, with native quick toggles for `/run/media/hp/SSS` and `~` (Home).
+- **Target Drive Focus**: Configured to search any directory, with native quick toggles for secondary drives (e.g. `/run/media/hp/SSS`) and `~` (Home).
 - **fzf-Like Fuzzy Scorer (`script/Fuzzy.js`)**: Evaluates camelCase boundaries, word separators (`_`, `-`, `/`, `.`), and consecutive character match sequences so abbreviation queries (e.g. `scshot` -> `screenshot.png`) hit immediately.
 - **Smart Frecency Ordering (`script/Frecency.js`)**: Automatically boosts frequently opened and recently modified files to the top of search results.
 - **Asynchronous Execution**: Background execution prevents UI thread blockages during large drive traversals.
@@ -105,7 +113,7 @@ A native modal dialog allows live customization of indexing boundaries:
 
 ## 3. Comprehensive Keyboard Reference
 
-Omarchy Recon is designed for 100% keyboard-only workflows. Every internal function is mapped to intuitive keybindings:
+Omarchy Recon is designed for 100% keyboard-only workflows:
 
 ### Main Finder Overlay
 | Keybinding | Action | Description |
@@ -197,29 +205,70 @@ Frecency history is maintained in `~/.config/omarchy/recon_frecency.json`.
 
 ---
 
-## 6. Installation & Integration
+## 6. Installation & Verification
 
-### Symlink Plugin
+### Prerequisites
+Make sure the following lightweight utilities are available on Arch Linux / Omarchy:
 ```bash
-ln -sfn /home/hp/Work/omarchy-recon ~/.config/omarchy/plugins/recon.finder
+sudo pacman -S --needed fd ripgrep wl-clipboard glib2 xdg-utils poppler
 ```
 
-### Enable in Omarchy Shell
+### Installation
+Clone the repository directly into your user-owned Omarchy plugins directory:
 ```bash
+git clone https://github.com/waldseelen/omarchy-recon.git ~/.config/omarchy/plugins/waldseelen.recon
+```
+
+Validate and enable the plugin in the Omarchy Quattro shell:
+```bash
+# Validate manifest schema compliance
+omarchy plugin validate ~/.config/omarchy/plugins/waldseelen.recon
+
+# Rescan and enable
 omarchy-shell shell rescanPlugins
-omarchy plugin enable recon.finder
+omarchy plugin enable waldseelen.recon
 omarchy restart shell
 ```
 
-### Hyprland Keybinding
-Add the shortcut in `~/.config/hypr/bindings.lua`:
-```lua
-o.bind("SUPER + M", "File Search (Recon)", "omarchy-shell shell toggle recon.finder")
+### Optional CLI Helper
+To summon Recon from anywhere in the terminal or scripts:
+```bash
+mkdir -p ~/.local/bin
+ln -sf ~/.config/omarchy/plugins/waldseelen.recon/bin/omarchy-recon ~/.local/bin/omarchy-recon
+chmod +x ~/.local/bin/omarchy-recon
 ```
 
-Reload Hyprland bindings:
+### Hyprland Keybinding
+Bind `SUPER + M` to toggle Recon by adding the following line to `~/.config/hypr/bindings.lua`:
+```lua
+o.bind("SUPER + M", "File Search (Recon)", "omarchy-shell shell toggle waldseelen.recon")
+```
+Then reload Hyprland:
 ```bash
 hyprctl reload
 ```
 
-Summon Recon anytime using **`SUPER + M`**.
+---
+
+## 7. Safe Removal (Uninstall)
+
+To cleanly disable and remove the plugin without touching any system packages:
+```bash
+# 1. Disable the plugin
+omarchy plugin disable waldseelen.recon
+
+# 2. Remove the plugin directory
+rm -rf ~/.config/omarchy/plugins/waldseelen.recon
+rm -f ~/.local/bin/omarchy-recon
+
+# 3. Rescan shell
+omarchy-shell shell rescanPlugins
+omarchy restart shell
+```
+(Optional) Remove the `SUPER + M` binding from `~/.config/hypr/bindings.lua` and run `hyprctl reload`.
+
+---
+
+## 8. License
+
+This project is licensed under the [MIT License](LICENSE) © 2026 waldseelen.

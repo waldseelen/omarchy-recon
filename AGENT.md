@@ -14,11 +14,11 @@ Follow the architectural maps and recipes below.
 
 ## 1. Architectural Map
 
-`omarchy-recon` is a native **Omarchy Quickshell QML Overlay Plugin** (`recon.finder`):
+`omarchy-recon` is a native **Omarchy Quickshell QML Overlay Plugin** (`waldseelen.recon`):
 
 ```text
 omarchy-recon/
-├── manifest.json              # Plugin contract (id: recon.finder, kind: overlay)
+├── manifest.json              # Plugin contract (id: waldseelen.recon, kind: overlay)
 ├── Recon.qml                  # Main entry point (PanelWindow, BorderSurface, Process engine, keyCatcher)
 ├── ReconHeader.qml            # Search input display & status badge
 ├── ReconTabs.qml              # Category filter chips (All, Folders, Docs, Code, PDF, Office, Images)
@@ -27,10 +27,10 @@ omarchy-recon/
 ├── script/
 │   └── Core.js                # Shared JS helpers (formatBytes, getTag, collapsePath, matchesTab)
 ├── bin/
-│   └── omarchy-recon          # CLI wrapper forwarding calls to `omarchy-shell shell toggle recon.finder`
+│   └── omarchy-recon          # CLI wrapper forwarding calls to `omarchy-shell shell toggle waldseelen.recon`
 ├── hypr/
 │   └── recon.lua              # Hyprland bindings template
-├── install.sh                 # Symlinks plugin to ~/.config/omarchy/plugins/recon.finder and enables it
+├── install.sh                 # Symlinks plugin to ~/.config/omarchy/plugins/waldseelen.recon and enables it
 ├── README.md                  # Human-facing user manual
 └── AGENT.md                   # This instruction file for AI agents
 ```
@@ -41,7 +41,7 @@ omarchy-recon/
 
 ```mermaid
 flowchart TD
-    A["User presses SUPER + M\nor runs 'omarchy-recon'"] --> B["omarchy-shell shell toggle recon.finder"]
+    A["User presses SUPER + M\nor runs 'omarchy-recon'"] --> B["omarchy-shell shell toggle waldseelen.recon"]
     B --> C["Recon.qml (Quickshell Overlay)"]
     C --> D["WlrLayer.Overlay with frosted-glass scrim"]
     C --> E["searchProc (fd + stat pipeline)"]
@@ -134,5 +134,5 @@ omarchy-shell shell rescanPlugins
 omarchy restart shell
 
 # 3. Test toggle
-omarchy-shell shell toggle recon.finder
+omarchy-shell shell toggle waldseelen.recon
 ```

@@ -221,7 +221,7 @@ Item {
       root.opened = false
       root.isAnimatingOut = false
       if (root.shell && typeof root.shell.hide === "function") {
-        root.shell.hide(root.manifest ? root.manifest.id : "recon.finder")
+        root.shell.hide(root.manifest ? root.manifest.id : "waldseelen.recon")
       }
     }
   }

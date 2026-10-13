@@ -1,10 +1,12 @@
 {
   "schemaVersion": 1,
-  "id": "recon.finder",
+  "id": "waldseelen.recon",
   "name": "Omarchy Recon",
-  "version": "1.0.0",
-  "author": "hp",
-  "description": "Fast native frosted-glass file & directory finder with live previews and keyboard actions",
+  "version": "2.0.0",
+  "author": "waldseelen",
+  "description": "Fast native frosted-glass file & directory finder with live previews and keyboard actions.",
+  "license": "MIT",
+  "repository": "https://github.com/waldseelen/omarchy-recon",
   "kinds": ["overlay"],
   "keepLoaded": true,
   "entryPoints": {

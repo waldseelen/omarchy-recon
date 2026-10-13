@@ -18,13 +18,16 @@ omarchy-recon: Native Omarchy frosted-glass file & directory finder overlay
 
 Usage:
   omarchy-recon [path]
-  omarchy-shell shell toggle recon.finder
+  omarchy-shell shell toggle waldseelen.recon
 
 Shortcuts inside Recon:
   [Enter]            Open file or folder in default application
   [Shift+Enter]      Copy absolute path to Wayland clipboard
   [Alt+Enter]        Reveal file in parent folder
-  [Tab / Shift+Tab]  Cycle category filter tabs (All, Folders, Docs, Code, PDF, Office, Images)
+  [Alt+A]            Open Power Actions menu (Terminal, VS Code, Copy, Info, Trash)
+  [F2]               Inline rename file/folder
+  [Ctrl+N]           Create new file / folder
+  [Tab / Shift+Tab]  Cycle category filter tabs
   [Del / Ctrl+D]     Move item to trash (gio trash)
   [Ctrl+C]           Copy file path
   [Esc]              Clear search query / close overlay
@@ -35,7 +38,7 @@ fi
 
 if [[ -n "$dir" ]]; then
   abs_dir="$(cd "$dir" 2>/dev/null && pwd || echo "$dir")"
-  omarchy-shell shell toggle recon.finder "{\"dir\": \"$abs_dir\"}"
+  omarchy-shell shell toggle waldseelen.recon "{\"dir\": \"$abs_dir\"}"
 else
-  omarchy-shell shell toggle recon.finder
+  omarchy-shell shell toggle waldseelen.recon
 fi
