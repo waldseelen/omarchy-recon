@@ -302,12 +302,29 @@ Item {
     root.dismiss()
   }
 
+  function copyFileContent(filePath) {
+    if (!filePath) return
+    Quickshell.execDetached([
+      "bash", "-lc",
+      'if [ -f "$1" ] && [ -r "$1" ]; then ' +
+      '  case "$1" in ' +
+      '    *.pdf|*.PDF) if command -v pdftotext >/dev/null 2>&1; then pdftotext "$1" - 2>/dev/null | wl-copy; else wl-copy < "$1"; fi ;; ' +
+      '    *) wl-copy < "$1" ;; ' +
+      '  esac; ' +
+      'else ' +
+      '  wl-copy -- "$1"; ' +
+      'fi',
+      "recon-copy",
+      filePath
+    ])
+  }
+
   function copySelectedPath() {
     if (displayModel.count === 0) return
     var item = displayModel.get(root.selectedIndex)
     if (item && item.path) {
       root.recordFrecency(item.path)
-      Util.execDetached("wl-copy " + Util.shellQuote(item.path))
+      Quickshell.execDetached(["wl-copy", "--", item.path])
     }
     root.dismiss()
   }
@@ -356,15 +373,14 @@ Item {
       Util.execDetached("code " + quotedPath + " 2>/dev/null || nvim " + quotedPath + " 2>/dev/null || xdg-open " + quotedPath + " 2>/dev/null &")
       root.dismiss()
     } else if (actionId === "copyPath") {
-      Util.execDetached("wl-copy " + quotedPath)
+      Quickshell.execDetached(["wl-copy", "--", path])
       root.dismiss()
     } else if (actionId === "copyRelPath") {
       var rel = path.startsWith(root.targetDir) ? path.substring(root.targetDir.length).replace(/^\//, "") : path
-      Util.execDetached("wl-copy " + Util.shellQuote(rel))
+      Quickshell.execDetached(["wl-copy", "--", rel])
       root.dismiss()
     } else if (actionId === "copyContent") {
-      var toCopy = root.previewContent || path
-      Util.execDetached("wl-copy " + Util.shellQuote(toCopy))
+      root.copyFileContent(path)
       root.dismiss()
     } else if (actionId === "trash") {
       root.trashSelected()
@@ -1000,8 +1016,9 @@ Item {
               isDir: root.previewIsDir
               isLoading: root.previewLoading
               onCopyRequested: {
-                var textToCopy = root.previewContent.length > 0 ? root.previewContent : root.previewPath
-                if (textToCopy) Util.execDetached("wl-copy " + Util.shellQuote(textToCopy))
+                if (root.previewPath) {
+                  root.copyFileContent(root.previewPath)
+                }
               }
             }
           }
