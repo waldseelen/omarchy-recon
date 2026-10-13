@@ -31,6 +31,20 @@ Rectangle {
     { id: "trash", icon: "🗑️", title: "Move to Trash", desc: "Send safely to system trash" }
   ]
 
+  function selectDelta(delta) {
+    selectedIndex = Math.max(0, Math.min(actionsList.length - 1, selectedIndex + delta))
+  }
+
+  function triggerSelected() {
+    var act = actionsList[selectedIndex]
+    if (act) executed(act.id, targetPath)
+  }
+
+  function initFocus() {
+    selectedIndex = 0
+    forceActiveFocus()
+  }
+
   Keys.onPressed: function(event) {
     if (event.key === Qt.Key_Escape) {
       actionsOverlay.closed()

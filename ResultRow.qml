@@ -30,17 +30,18 @@ Rectangle {
     anchors.left: parent.left
     anchors.leftMargin: Style.space(10)
     anchors.verticalCenter: parent.verticalCenter
-    width: Style.space(44)
+    width: Math.max(Style.space(48), tagText.implicitWidth + Style.space(12))
     height: Style.space(22)
     radius: Style.space(4)
     color: rowRoot.isSelected
       ? Util.alpha(Color.menu.selectedText, 0.25)
-      : (rowRoot.rowTag === "DIR" ? Util.alpha(Color.accent, 0.2) : Util.alpha(Color.menu.border, 0.3))
+      : (rowRoot.rowTag === "DIR" ? Util.alpha(Color.accent, 0.2) : (rowRoot.rowTag === "MATCH" ? Util.alpha(Color.accent, 0.3) : Util.alpha(Color.menu.border, 0.3)))
 
     Text {
+      id: tagText
       anchors.centerIn: parent
       text: rowRoot.rowTag
-      color: rowRoot.isSelected ? Color.menu.selectedText : (rowRoot.rowTag === "DIR" ? Color.accent : Color.menu.text)
+      color: rowRoot.isSelected ? Color.menu.selectedText : (rowRoot.rowTag === "DIR" || rowRoot.rowTag === "MATCH" ? Color.accent : Color.menu.text)
       font.family: rowRoot.fontFamily
       font.pixelSize: rowRoot.captionSize
       font.weight: Font.Bold

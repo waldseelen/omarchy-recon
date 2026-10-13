@@ -53,6 +53,22 @@ Item {
     }
   }
 
+  onActionsOpenChanged: {
+    if (root.actionsOpen) {
+      Qt.callLater(function() { actionsMenu.initFocus() })
+    } else {
+      Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    }
+  }
+
+  onInlineModalOpenChanged: {
+    if (root.inlineModalOpen) {
+      Qt.callLater(function() { inlineModal.initFocus() })
+    } else {
+      Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    }
+  }
+
   // Preview state
   property string previewContent: ""
   property string previewPath: ""
@@ -603,6 +619,11 @@ Item {
       cmd = "ls -1 -p " + quoted + " 2>/dev/null | head -n 40"
     } else if (item.tag === "PDF") {
       cmd = "pdftotext -l 5 " + quoted + " - 2>/dev/null | head -n 100 || file -b " + quoted
+    } else if (item.tag === "MATCH" && item.sizeText && item.sizeText.startsWith("L")) {
+      var lineNum = parseInt(item.sizeText.substring(1), 10) || 1
+      var startLine = Math.max(1, lineNum - 12)
+      var endLine = lineNum + 65
+      cmd = "sed -n '" + startLine + "," + endLine + "p' " + quoted + " 2>/dev/null || head -n 250 " + quoted
     } else {
       cmd = "head -n 250 " + quoted + " 2>/dev/null || file -b " + quoted
     }
@@ -704,6 +725,15 @@ Item {
           if (root.actionsOpen) {
             if (event.key === Qt.Key_Escape) {
               root.actionsOpen = false
+              event.accepted = true
+            } else if (event.key === Qt.Key_Up || ((event.key === Qt.Key_K) && (event.modifiers & Qt.ControlModifier))) {
+              actionsMenu.selectDelta(-1)
+              event.accepted = true
+            } else if (event.key === Qt.Key_Down || ((event.key === Qt.Key_J) && (event.modifiers & Qt.ControlModifier))) {
+              actionsMenu.selectDelta(1)
+              event.accepted = true
+            } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+              actionsMenu.triggerSelected()
               event.accepted = true
             }
             return

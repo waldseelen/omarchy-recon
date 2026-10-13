@@ -132,6 +132,7 @@ Rectangle {
           selectionColor: Color.menu.selectedBackground
           selectedTextColor: Color.menu.selectedText
 
+          Keys.onEscapePressed: modalOverlay.closed()
           Keys.onReturnPressed: {
             var val = inputField.text.trim()
             if (val) modalOverlay.confirmed(modalOverlay.mode, val, modalOverlay.targetPath)
