@@ -7,6 +7,10 @@
 > **Native Frosted-Glass File & Directory Finder Overlay for Omarchy / Hyprland (Wayland)**  
 > High-performance desktop search, live document/code previewer, in-file ripgrep search, power action popover, and desktop command center engineered natively with Quickshell QML and Wayland Layer-Shell protocols.
 
+<p align="center">
+  <img src="preview.png" alt="Omarchy Recon Preview" width="100%">
+</p>
+
 ---
 
 ## 1. System Overview & Architecture
