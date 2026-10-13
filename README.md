@@ -1,7 +1,7 @@
 # Omarchy Recon
 
 > **Native QML File & Directory Finder Overlay for Omarchy / Hyprland (Wayland)**  
-> High-performance desktop search, live document/code previewer, and execution overlay engineered natively with Quickshell QML and Wayland Layer-Shell protocols.
+> High-performance desktop search, live document/code previewer, in-file ripgrep search, and desktop command center engineered natively with Quickshell QML and Wayland Layer-Shell protocols.
 
 ---
 
@@ -23,13 +23,14 @@
        ┌──────────────────────▼───┐      ┌───▼──────────────────────┐
        │   Asynchronous Search    │      │   Live Preview Pipeline  │
        │  • Substring & Fuzzy     │      │  • Native TextEdit Copy  │
-       │  • Exclusions Filtering  │      │  • pdftotext Extraction  │
-       │  • Debounced Process     │      │  • Async Image Loading   │
+       │  • In-File Ripgrep (?Q)  │      │  • pdftotext Extraction  │
+       │  • Frecency Ranking      │      │  • Async Image Loading   │
        └──────────────────────────┘      └──────────────────────────┘
                               │              │
        ┌──────────────────────▼──────────────▼───┐
        │     Atomic State Persistence (JSON)     │
        │         ~/.config/omarchy/recon.json    │
+       │     ~/.config/omarchy/recon_frecency.json
        └─────────────────────────────────────────┘
 ```
 
@@ -42,14 +43,33 @@
 
 ## 2. Core Capabilities
 
-### 🔍 Target Search Engine
+### 🔍 Target Search & Typo-Tolerant Fuzzy Engine
 - **Target Drive Focus**: Configured to search any directory, with native quick toggles for `/run/media/hp/SSS` and `~` (Home).
+- **fzf-Like Fuzzy Scorer (`script/Fuzzy.js`)**: Evaluates camelCase boundaries, word separators (`_`, `-`, `/`, `.`), and consecutive character match sequences so abbreviation queries (e.g. `scshot` -> `screenshot.png`) hit immediately.
+- **Smart Frecency Ordering (`script/Frecency.js`)**: Automatically boosts frequently opened and recently modified files to the top of search results.
 - **Asynchronous Execution**: Background execution prevents UI thread blockages during large drive traversals.
 - **Live Search Debounce**: Typing queries updates results dynamically without spawning redundant process cascades.
-- **Smart Result Metadata**: Displays formatted file sizes (`B`, `K`, `M`, `G`), relative parent paths, and categorical color-coded badge tags (`DIR`, `DOC`, `CODE`, `PDF`, `SHEET`, `IMAGE`, `MEDIA`, `FILE`).
+
+### 📄 In-File Content Search Mode (Ripgrep)
+- **Instant Full-Text Search**: Prefix any search query with `?` (e.g. `?import QtQuick` or `?def calculate`) or press `Ctrl + F` to switch to Ripgrep in-file mode.
+- **Line & Snippet Reporting**: Results display the exact matching line number and preview excerpt directly in the list (`Core.js :42 — const foo = bar`).
+- **Deep Preview Integration**: Selecting an in-file match loads the document directly with matching content.
+
+### ⚡ Power Actions Context Menu (`Alt + A`)
+- Pressing `Alt + A` on any search result opens a sleek, keyboard-driven action popover:
+  1. **Open Default**: Launch in system default app (`xdg-open`).
+  2. **Open in Terminal**: Open containing folder in terminal (`foot` / `xdg-terminal-exec`).
+  3. **Open in Editor**: Open file in code editor (`code` / `nvim`).
+  4. **Copy Relative Path**: Copy path relative to search root (clean for code reviews and markdown links).
+  5. **Copy File Content**: Dump entire file text directly into Wayland clipboard (`wl-copy`).
+  6. **Move to Trash**: Safe trash disposal via `gio trash`.
+
+### ✏️ In-Place File Operations (`F2` Rename & `Ctrl + N` New File)
+- **Inline Rename (`F2`)**: Press `F2` on any selected item to open an anchor-based rename modal with current basename pre-filled and extension preserved.
+- **Inline New File (`Ctrl + N`)**: Press `Ctrl + N` to create a new file or note directly inside the target search folder and immediately open it in your editor.
 
 ### 📄 Interactive Live Preview Pipeline
-- **Selectable & Copyable Text Preview**: Unlike static text viewers, Recon features an embedded `TextEdit` inside a smooth `Flickable` viewport. Users can select code snippets or text with mouse drag and copy directly.
+- **Selectable & Copyable Text Preview**: Embedded `TextEdit` inside a smooth `Flickable` viewport allows mouse text selection and clipboard copying.
 - **One-Click Content Copy**: Header `Copy All` button instantly transfers full preview contents to the Wayland clipboard via `wl-copy`.
 - **Multi-Format Extraction**:
   - **Source Code & Text**: Instantaneous head extraction for code, markdown, configuration, and plain text.
@@ -74,14 +94,12 @@ Filter large file sets across two synchronized layers:
    - **Images**: `All Images`, `PNG (.png)`, `JPG (.jpg)`, `WebP (.webp)`, `SVG (.svg)`
 
 ### ⚙️ Persistent Settings & Exclusion Manager
-A native modal dialog allows live customization of indexing boundaries without touching config files manually:
+A native modal dialog allows live customization of indexing boundaries:
 - **Search Target Directory**: Editable text input with instant shortcut buttons for SSS drive and User Home.
 - **Excluded Directories**: Visual interactive chip tags (`📁 DOTFILES`, `📁 BRAIN`, `📁 node_modules`, `📁 .git`, etc.).
-  - Easily add new folders by typing and pressing `Enter`.
-  - Remove folders with one click or via keyboard backspace.
 - **Excluded File Extensions**: Filter out build artifacts or temporary files (`.tmp`, `.bak`, `.log`, `.iso`, etc.).
 - **Hidden Dot-Folder Toggle**: One-switch exclusion for all hidden directories (`.*`).
-- **Atomic Persistence**: Configurations are automatically stored in `~/.config/omarchy/recon.json` via Quickshell's native `FileView`.
+- **Atomic Persistence**: Configurations are automatically stored in `~/.config/omarchy/recon.json`.
 
 ---
 
@@ -94,6 +112,10 @@ Omarchy Recon is designed for 100% keyboard-only workflows. Every internal funct
 | :--- | :--- | :--- |
 | **`SUPER + M`** | **Summon / Dismiss** | Hyprland global shortcut to toggle the finder overlay. |
 | **`↵ Enter`** | **Open** | Launch selected file or folder in default application (`xdg-open`). |
+| **`⎇ Alt + A`** | **Power Actions** | Open contextual action menu on selected item. |
+| **`F2`** | **Rename Item** | Rename selected file/folder in-place. |
+| **`Ctrl + N`** | **New File / Note** | Create a new file directly inside the target directory. |
+| **`Ctrl + F` / `?`** | **In-File Mode** | Toggle Ripgrep in-file content search mode. |
 | **`⇧ Shift + Enter`** | **Copy Path** | Copy absolute path to Wayland clipboard (`wl-copy`) and close. |
 | **`⎇ Alt + Enter`** | **Reveal Folder** | Open enclosing folder in the default desktop file manager. |
 | **`Ctrl + C`** | **Copy Path** | Copy selected item's absolute path to clipboard. |
@@ -131,8 +153,11 @@ Omarchy Recon is designed for 100% keyboard-only workflows. Every internal funct
 | **Rendering Framework** | Quickshell QML | Quickshell QML | Quickshell QML | **Quickshell QML** |
 | **Native BorderSurface Glass** | Basic | Partial | Basic | **Full Acrylic / Tokens** |
 | **Interactive Text Preview** | None | Read-only static text | None | **Selectable & Copyable `TextEdit`** |
+| **In-File Content Search** | None | None | None | **Ripgrep (`?query` / `Ctrl+F`)** |
+| **Contextual Power Actions** | None | None | None | **`Alt+A` (Terminal, Editor, Diff)** |
+| **In-Place File Operations** | None | None | None | **`F2` Rename & `Ctrl+N` New File** |
+| **Frecency & Fuzzy Scoring** | Alphabetical | Basic substring | Window order | **fzf Scoring + Frecency Ranking** |
 | **Multi-Format Extraction** | None | Text only | None | **Code, Plaintext, PDF, Images, Dirs** |
-| **Full Image Viewer** | None | Unscaled | None | **Asynchronous Aspect-Fit Render** |
 | **Sub-Filter Refinements** | None | Fixed tabs | None | **Dynamic 2-Tier Extension Chips** |
 | **Exclusions Management** | Hardcoded | Hardcoded | None | **Live GUI & Persistent JSON Engine** |
 | **100% Keyboard Operability** | Search only | Partial | Window switch | **Full Finder & Modal Keyboard Control** |
@@ -167,6 +192,8 @@ Settings are saved automatically to `~/.config/omarchy/recon.json`:
   "excludeHidden": true
 }
 ```
+
+Frecency history is maintained in `~/.config/omarchy/recon_frecency.json`.
 
 ---
 
