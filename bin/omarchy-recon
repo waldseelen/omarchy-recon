@@ -6,7 +6,7 @@
 # omarchy:group=file
 # omarchy:name=recon
 # omarchy:args=[path]
-# omarchy:examples=omarchy-recon|omarchy-recon /run/media/hp/SSS
+# omarchy:examples=omarchy-recon|omarchy-recon ~/Documents
 # ==============================================================================
 set -euo pipefail
 
@@ -37,8 +37,18 @@ EOF
 fi
 
 if [[ -n "$dir" ]]; then
-  abs_dir="$(cd "$dir" 2>/dev/null && pwd || echo "$dir")"
-  omarchy-shell shell toggle waldseelen.recon "{\"dir\": \"$abs_dir\"}"
+  if [[ "$dir" == *[$'\n\r\t']* ]]; then
+    echo "omarchy-recon: control characters in path are not allowed" >&2
+    exit 1
+  fi
+  abs_dir="$(cd -- "$dir" 2>/dev/null && pwd)" || {
+    echo "omarchy-recon: not a directory: $dir" >&2
+    exit 1
+  }
+  # Escape for a JSON string value (backslash first, then quote).
+  json_dir="${abs_dir//\\/\\\\}"
+  json_dir="${json_dir//\"/\\\"}"
+  omarchy-shell shell toggle waldseelen.recon "{\"dir\": \"$json_dir\"}"
 else
   omarchy-shell shell toggle waldseelen.recon
 fi

@@ -7,6 +7,7 @@ import qs.Ui
 import "script/Core.js" as Core
 import "script/Fuzzy.js" as Fuzzy
 import "script/Frecency.js" as Frecency
+import "script/Safe.js" as Safe
 
 Item {
   id: root
@@ -15,7 +16,7 @@ Item {
   property var manifest: null
   property bool opened: false
   property string home: Quickshell.env("HOME")
-  property string targetDir: "/run/media/hp/SSS"
+  property string targetDir: Quickshell.env("HOME")
   property string filterText: ""
   property string activeTab: "all"
   property string activeSubFilter: "all"
@@ -38,7 +39,7 @@ Item {
   property string inlineModalInitial: ""
 
   // Settings State
-  property var excludeDirs: ["DOTFILES", "BRAIN", "KUBUNTU", "WIN", "MEDIA", ".Trash-1000", "node_modules", ".git"]
+  property var excludeDirs: ["node_modules", ".git", "__pycache__", ".venv", ".cache"]
   property var excludeExts: ["tmp", "bak", "log", "iso", "bin"]
   property bool excludeHidden: true
 
@@ -97,9 +98,35 @@ Item {
   property int cardHeight: Math.min(Style.space(660), panel.height - Style.gapsOut * 2)
 
   // ---- Settings Persistence ----
+  // State files hold search settings and a path-access history. They are
+  // created/kept 0600 *before* FileView first touches them (stateReady gate),
+  // and re-secured after every save (atomic writes may recreate the file).
+  property bool stateReady: false
+  readonly property string configPath: root.home + "/.config/omarchy/recon.json"
+  readonly property string frecencyPath: root.home + "/.config/omarchy/recon_frecency.json"
+
+  Process {
+    id: securePrep
+    command: [
+      "bash", "-c",
+      'umask 077; for f in "$@"; do [ -e "$f" ] || : > "$f"; chmod 600 -- "$f"; done',
+      "recon-secure", root.configPath, root.frecencyPath
+    ]
+    onExited: root.stateReady = true
+  }
+
+  Timer {
+    id: secureAfterSave
+    interval: 400
+    repeat: false
+    onTriggered: if (!securePrep.running) securePrep.running = true
+  }
+
+  Component.onCompleted: securePrep.running = true
+
   FileView {
     id: configFile
-    path: root.home + "/.config/omarchy/recon.json"
+    path: root.stateReady ? root.configPath : ""
     watchChanges: false
     atomicWrites: true
     printErrors: false
@@ -110,10 +137,16 @@ Item {
   function loadConfig(raw) {
     try {
       var data = JSON.parse(String(raw || "").trim() || "{}")
-      if (data.targetDir && typeof data.targetDir === "string") root.targetDir = data.targetDir
-      if (Array.isArray(data.excludeDirs)) root.excludeDirs = data.excludeDirs
-      if (Array.isArray(data.excludeExts)) root.excludeExts = data.excludeExts
-      if (typeof data.excludeHidden === "boolean") root.excludeHidden = data.excludeHidden
+      var clean = Safe.sanitizeConfig(data, {
+        targetDir: root.targetDir,
+        excludeDirs: root.excludeDirs,
+        excludeExts: root.excludeExts,
+        excludeHidden: root.excludeHidden
+      })
+      root.targetDir = clean.targetDir
+      root.excludeDirs = clean.excludeDirs
+      root.excludeExts = clean.excludeExts
+      root.excludeHidden = clean.excludeHidden
     } catch(e) {}
   }
 
@@ -125,23 +158,28 @@ Item {
       excludeHidden: root.excludeHidden
     }
     configFile.setText(JSON.stringify(payload, null, 2) + "\n")
+    secureAfterSave.restart()
   }
 
   // ---- Frecency Persistence ----
   FileView {
     id: frecencyFile
-    path: root.home + "/.config/omarchy/recon_frecency.json"
+    path: root.stateReady ? root.frecencyPath : ""
     watchChanges: false
     atomicWrites: true
     printErrors: false
     onLoaded: {
-      try { root.frecencyData = JSON.parse(text() || "{}") } catch(e) {}
+      try {
+        var parsed = JSON.parse(text() || "{}")
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) root.frecencyData = parsed
+      } catch(e) {}
     }
     onLoadFailed: root.saveFrecency()
   }
 
   function saveFrecency() {
     frecencyFile.setText(JSON.stringify(root.frecencyData, null, 2) + "\n")
+    secureAfterSave.restart()
   }
 
   function recordFrecency(path) {
@@ -154,7 +192,7 @@ Item {
   function open(payloadJson) {
     var payload = {}
     try { payload = JSON.parse(payloadJson || "{}") } catch(e) { payload = {} }
-    if (payload.dir && typeof payload.dir === "string") {
+    if (payload && Safe.isSafeAbsPath(payload.dir)) {
       root.targetDir = payload.dir
     }
     root.opened = true
@@ -295,21 +333,22 @@ Item {
   function openSelected() {
     if (displayModel.count === 0) return
     var item = displayModel.get(root.selectedIndex)
-    if (item && item.path) {
+    if (item && Safe.isSafeAbsPath(item.path)) {
       root.recordFrecency(item.path)
-      Util.execDetached("xdg-open " + Util.shellQuote(item.path))
+      Util.execArgv(["xdg-open", item.path])
     }
     root.dismiss()
   }
 
   function copyFileContent(filePath) {
-    if (!filePath) return
+    if (!Safe.isSafeAbsPath(filePath) || Safe.isSensitivePath(filePath)) return
+    // Content flows file -> stdin -> wl-copy; never through argv.
     Quickshell.execDetached([
-      "bash", "-lc",
+      "bash", "-c",
       'if [ -f "$1" ] && [ -r "$1" ]; then ' +
       '  case "$1" in ' +
-      '    *.pdf|*.PDF) if command -v pdftotext >/dev/null 2>&1; then pdftotext "$1" - 2>/dev/null | wl-copy; else wl-copy < "$1"; fi ;; ' +
-      '    *) wl-copy < "$1" ;; ' +
+      '    *.pdf|*.PDF) if command -v pdftotext >/dev/null 2>&1; then timeout 20 pdftotext "$1" - 2>/dev/null | wl-copy --sensitive; else head -c 8388608 -- "$1" | wl-copy --sensitive; fi ;; ' +
+      '    *) head -c 8388608 -- "$1" | wl-copy --sensitive ;; ' +
       '  esac; ' +
       'else ' +
       '  wl-copy -- "$1"; ' +
@@ -332,45 +371,64 @@ Item {
   function revealSelectedFolder() {
     if (displayModel.count === 0) return
     var item = displayModel.get(root.selectedIndex)
-    if (item && item.path) {
+    if (item && Safe.isSafeAbsPath(item.path)) {
       root.recordFrecency(item.path)
       var folder = item.isDir ? item.path : Core.getDirName(item.path)
-      Util.execDetached("xdg-open " + Util.shellQuote(folder))
+      if (Safe.isSafeAbsPath(folder)) Util.execArgv(["xdg-open", folder])
     }
     root.dismiss()
   }
 
+  // Asks for confirmation; the actual move happens in performTrash().
   function trashSelected() {
     if (displayModel.count === 0) return
     var item = displayModel.get(root.selectedIndex)
-    if (item && item.path) {
-      Util.execDetached("gio trash " + Util.shellQuote(item.path))
-      displayModel.remove(root.selectedIndex)
-      if (root.selectedIndex >= displayModel.count) root.selectedIndex = Math.max(0, displayModel.count - 1)
-      if (displayModel.count > 0) root.executePreview()
-      else root.clearPreview()
+    if (!item || !Safe.isSafeAbsPath(item.path)) return
+    root.actionsOpen = false
+    root.inlineModalMode = "trash"
+    root.inlineModalPath = item.path
+    root.inlineModalInitial = "yes"
+    root.inlineModalOpen = true
+    Qt.callLater(function() { inlineModal.initFocus() })
+  }
+
+  function performTrash(path) {
+    if (!Safe.isSafeAbsPath(path)) return
+    Util.execArgv(["gio", "trash", "--", path])
+    for (var i = 0; i < displayModel.count; i++) {
+      if (displayModel.get(i).path === path) {
+        displayModel.remove(i)
+        break
+      }
     }
+    if (root.selectedIndex >= displayModel.count) root.selectedIndex = Math.max(0, displayModel.count - 1)
+    if (displayModel.count > 0) root.executePreview()
+    else root.clearPreview()
   }
 
   function runAction(actionId, path) {
-    if (!path) return
+    if (!Safe.isSafeAbsPath(path)) return
     root.recordFrecency(path)
     root.actionsOpen = false
 
     var item = displayModel.get(root.selectedIndex)
     var isDir = item ? item.isDir : false
     var folder = isDir ? path : Core.getDirName(path)
-    var quotedPath = Util.shellQuote(path)
-    var quotedFolder = Util.shellQuote(folder)
 
     if (actionId === "open") {
-      Util.execDetached("xdg-open " + quotedPath)
+      Util.execArgv(["xdg-open", path])
       root.dismiss()
     } else if (actionId === "term") {
-      Util.execDetached("xdg-terminal-exec --working-directory " + quotedFolder + " 2>/dev/null || foot -D " + quotedFolder + " 2>/dev/null &")
+      if (Safe.isSafeAbsPath(folder)) {
+        Quickshell.execDetached(["bash", "-lc",
+          'xdg-terminal-exec --working-directory "$1" 2>/dev/null || foot -D "$1" 2>/dev/null',
+          "recon-term", folder])
+      }
       root.dismiss()
     } else if (actionId === "editor") {
-      Util.execDetached("code " + quotedPath + " 2>/dev/null || nvim " + quotedPath + " 2>/dev/null || xdg-open " + quotedPath + " 2>/dev/null &")
+      Quickshell.execDetached(["bash", "-lc",
+        'code "$1" 2>/dev/null || nvim "$1" 2>/dev/null || xdg-open "$1" 2>/dev/null',
+        "recon-edit", path])
       root.dismiss()
     } else if (actionId === "copyPath") {
       Quickshell.execDetached(["wl-copy", "--", path])
@@ -391,15 +449,23 @@ Item {
     root.inlineModalOpen = false
     if (!val) return
 
-    if (mode === "rename") {
-      var dir = Core.getDirName(targetPath)
-      var newPath = dir + "/" + val
-      Util.execDetached("mv " + Util.shellQuote(targetPath) + " " + Util.shellQuote(newPath))
+    if (mode === "trash") {
+      var answer = String(val).trim().toLowerCase()
+      if (answer === "yes" || answer === "y") root.performTrash(targetPath)
+    } else if (mode === "rename") {
+      var name = Safe.sanitizeEntryName(val)
+      if (!name || !Safe.isSafeAbsPath(targetPath)) return
+      var newPath = Core.getDirName(targetPath) + "/" + name
+      // -n: never overwrite an existing file.
+      Util.execArgv(["mv", "-n", "--", targetPath, newPath])
       searchDebounce.restart()
     } else if (mode === "newfile") {
-      var newFilePath = root.targetDir + "/" + val
-      var quotedNew = Util.shellQuote(newFilePath)
-      Util.execDetached("mkdir -p $(dirname " + quotedNew + ") && touch " + quotedNew + " && xdg-open " + quotedNew + " 2>/dev/null &")
+      var rel = Safe.sanitizeRelPath(val)
+      if (!rel || !Safe.isSafeAbsPath(root.targetDir)) return
+      var newFilePath = Safe.joinInside(root.targetDir, rel)
+      Quickshell.execDetached(["bash", "-lc",
+        'mkdir -p -- "$(dirname -- "$1")" && touch -- "$1" && xdg-open "$1" 2>/dev/null',
+        "recon-new", newFilePath])
       searchDebounce.restart()
     }
   }
@@ -425,71 +491,32 @@ Item {
 
   function executeSearch() {
     if (!root.opened) return
-    var target = root.targetDir
     var rawQ = root.filterText.trim()
     var isRg = root.isContentSearch || rawQ.startsWith("?")
     var q = rawQ.startsWith("?") ? rawQ.slice(1).trim() : rawQ
-    var tab = root.activeTab
-    var sub = root.activeSubFilter
 
-    var excludeFlags = ""
-    for (var i = 0; i < root.excludeDirs.length; i++) {
-      var d = String(root.excludeDirs[i] || "").trim()
-      if (d) excludeFlags += (isRg ? " --glob " + Util.shellQuote("!" + d + "/**") : " --exclude " + Util.shellQuote(d))
-    }
-    for (var j = 0; j < root.excludeExts.length; j++) {
-      var ext = String(root.excludeExts[j] || "").trim().replace(/^\./, "")
-      if (ext) excludeFlags += (isRg ? " --glob " + Util.shellQuote("!*." + ext) : " -E '*." + ext + "'")
+    if (isRg && !q) {
+      displayModel.clear()
+      clearPreview()
+      root.isSearching = false
+      return
     }
 
-    var hiddenFlag = root.excludeHidden ? "" : (isRg ? " --hidden " : " -H ")
-    var quotedTarget = Util.shellQuote(target)
-
-    var cmd = ""
-    if (isRg) {
-      if (!q) {
-        displayModel.clear()
-        clearPreview()
-        root.isSearching = false
-        return
-      }
-      var rgPattern = Util.shellQuote(q)
-      cmd = "t=" + quotedTarget + "; [[ ! -d \"$t\" ]] && t=\"$HOME\"; " +
-            "rg --color=never --no-heading --line-number --max-count=1 --smart-case " +
-            hiddenFlag + excludeFlags + " " + rgPattern + " \"$t\" 2>/dev/null | head -n 120"
-    } else {
-      var typeFlags = ""
-      if (tab === "folders") {
-        typeFlags = "-t d"
-      } else if (tab === "docs") {
-        if (sub === "md") typeFlags = "-t f -e md"
-        else if (sub === "pdf") typeFlags = "-t f -e pdf"
-        else if (sub === "txt") typeFlags = "-t f -e txt"
-        else if (sub === "org") typeFlags = "-t f -e org"
-        else typeFlags = "-t f -e md -e txt -e org -e pdf"
-      } else if (tab === "code") {
-        if (sub === "all") typeFlags = "-t f -e py -e js -e ts -e html -e css -e lua -e c -e cpp -e rs -e go -e json"
-        else if (sub === "c") typeFlags = "-t f -e c -e cpp -e h -e hpp"
-        else typeFlags = "-t f -e " + sub
-      } else if (tab === "office") {
-        if (sub === "all") typeFlags = "-t f -e docx -e doc -e odt -e xlsx -e pptx -e csv"
-        else typeFlags = "-t f -e " + sub
-      } else if (tab === "images") {
-        if (sub === "all") typeFlags = "-t f -e png -e jpg -e jpeg -e webp -e gif -e svg"
-        else if (sub === "jpg") typeFlags = "-t f -e jpg -e jpeg"
-        else typeFlags = "-t f -e " + sub
-      }
-
-      var depthFlag = q ? "" : "--max-depth 3"
-      var patternArg = q ? Util.shellQuote(q) : "''"
-      cmd = "t=" + quotedTarget + "; [[ ! -d \"$t\" ]] && t=\"$HOME\"; " +
-            "fd -i " + (root.excludeHidden ? "" : "-H") + " " + excludeFlags + " " +
-            typeFlags + " " + depthFlag + " " + patternArg + " \"$t\" 2>/dev/null | head -n 250 | xargs -d '\\n' -r stat --printf='%F\\t%s\\t%n\\n' 2>/dev/null"
-    }
+    var built = Safe.buildSearch({
+      isRg: isRg,
+      q: q,
+      target: root.targetDir,
+      excludeDirs: root.excludeDirs,
+      excludeExts: root.excludeExts,
+      excludeHidden: root.excludeHidden,
+      tab: root.activeTab,
+      sub: root.activeSubFilter
+    })
 
     if (searchProc.running) searchProc.running = false
     root.isSearching = true
-    searchProc.command = ["bash", "-c", cmd]
+    searchProc.environment = built.env
+    searchProc.command = built.argv
     searchProc.running = true
   }
 
@@ -629,22 +656,8 @@ Item {
 
     if (previewProc.running) previewProc.running = false
 
-    var cmd = ""
-    var quoted = Util.shellQuote(item.path)
-    if (item.isDir) {
-      cmd = "ls -1 -p " + quoted + " 2>/dev/null | head -n 40"
-    } else if (item.tag === "PDF") {
-      cmd = "pdftotext -l 5 " + quoted + " - 2>/dev/null | head -n 100 || file -b " + quoted
-    } else if (item.tag === "MATCH" && item.sizeText && item.sizeText.startsWith("L")) {
-      var lineNum = parseInt(item.sizeText.substring(1), 10) || 1
-      var startLine = Math.max(1, lineNum - 12)
-      var endLine = lineNum + 65
-      cmd = "sed -n '" + startLine + "," + endLine + "p' " + quoted + " 2>/dev/null || head -n 250 " + quoted
-    } else {
-      cmd = "head -n 250 " + quoted + " 2>/dev/null || file -b " + quoted
-    }
-
-    previewProc.command = ["bash", "-c", cmd]
+    var pv = Safe.buildPreview(item)
+    previewProc.command = pv.argv
     previewProc.running = true
   }
 
@@ -1130,10 +1143,13 @@ Item {
           Qt.callLater(function() { keyCatcher.forceActiveFocus() })
         }
         onSaved: function(newTarget, newDirs, newExts, newHidden) {
-          root.targetDir = newTarget
-          root.excludeDirs = newDirs
-          root.excludeExts = newExts
-          root.excludeHidden = newHidden
+          var clean = Safe.sanitizeConfig(
+            { targetDir: newTarget, excludeDirs: newDirs, excludeExts: newExts, excludeHidden: newHidden },
+            { targetDir: root.targetDir, excludeDirs: root.excludeDirs, excludeExts: root.excludeExts, excludeHidden: root.excludeHidden })
+          root.targetDir = clean.targetDir
+          root.excludeDirs = clean.excludeDirs
+          root.excludeExts = clean.excludeExts
+          root.excludeHidden = clean.excludeHidden
           root.saveConfig()
           root.settingsOpen = false
           root.executeSearch()

@@ -97,10 +97,10 @@ flowchart TD
 
 ### Recipe B: Changing Target Exclusions or Default Drive
 In [`Recon.qml`](Recon.qml):
-- Default target directory: `property string targetDir: "/run/media/hp/SSS"`
-- Excluded directories in `executeSearch()`:
+- Default target directory: `property string targetDir: Quickshell.env("HOME")`
+- Excluded directories are validated and turned into flags by `buildSearch()` in [`script/Safe.js`](script/Safe.js) (never concatenate user input into shell strings there):
   ```js
-  fd -i --exclude DOTFILES --exclude BRAIN --exclude KUBUNTU --exclude WIN --exclude MEDIA --exclude '.Trash*' ...
+  fd -i --exclude node_modules --exclude .git ...
   ```
 Add any new folder to `--exclude <NAME>`.
 

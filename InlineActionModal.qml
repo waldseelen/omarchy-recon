@@ -12,11 +12,11 @@ Rectangle {
   focus: true
   Keys.priority: Keys.BeforeItem
 
-  property string mode: "rename" // "rename" | "newfile"
+  property string mode: "rename" // "rename" | "newfile" | "trash"
   property string targetPath: ""
   property string initialValue: ""
-  property string promptText: mode === "rename" ? "Rename Item" : "Create New File / Note"
-  property string subText: mode === "rename" ? targetPath : "File will be created in target directory"
+  property string promptText: mode === "rename" ? "Rename Item" : (mode === "trash" ? "Move to Trash? (Enter = yes, Esc = cancel)" : "Create New File / Note")
+  property string subText: (mode === "rename" || mode === "trash") ? targetPath : "File will be created in target directory"
 
   signal confirmed(string mode, string value, string targetPath)
   signal closed()
@@ -184,7 +184,7 @@ Rectangle {
           Text {
             id: confirmText
             anchors.centerIn: parent
-            text: modalOverlay.mode === "rename" ? "Rename (↵)" : "Create (↵)"
+            text: modalOverlay.mode === "rename" ? "Rename (↵)" : (modalOverlay.mode === "trash" ? "Trash (↵)" : "Create (↵)")
             color: Color.menu.selectedText
             font.family: Style.font.family
             font.pixelSize: Style.space(11)

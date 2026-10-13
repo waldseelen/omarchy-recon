@@ -7,7 +7,7 @@
 TARGET_DIR="${HOME}"
 
 # Space-separated list of folder names or patterns to exclude from search
-EXCLUDE_DIRS="DOTFILES BRAIN KUBUNTU WIN MEDIA .Trash-1000 .trash .git node_modules __pycache__ .venv"
+EXCLUDE_DIRS=".trash .git node_modules __pycache__ .venv .cache"
 
 # Whether to include hidden files and dot-folders (true / false)
 # Default is false (all .* folders and files are skipped)

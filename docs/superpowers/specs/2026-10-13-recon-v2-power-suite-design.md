@@ -104,7 +104,7 @@ Omarchy Recon is currently a fast, native frosted-glass file name finder and pre
 ---
 
 ## 5. Verification Plan
-1. **Ripgrep Verification**: Search known string across files in `/run/media/hp/SSS`; verify result paths and line previews.
+1. **Ripgrep Verification**: Search known string across files in a test directory; verify result paths and line previews.
 2. **Action Runner Verification**: Test `Open in Terminal` (Kitty) and `Open in Editor` (Code) on selected file.
 3. **Frecency Verification**: Open file, restart Recon, verify file ranks higher on blank query.
 4. **Rename/New File Verification**: Rename dummy file via `F2`, create new file via `Ctrl+N`, confirm filesystem changes on disk.

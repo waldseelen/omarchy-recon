@@ -13,7 +13,7 @@ Rectangle {
   focus: true
   Keys.priority: Keys.BeforeItem
 
-  property string targetDir: "/run/media/hp/SSS"
+  property string targetDir: Quickshell.env("HOME")
   property var excludeDirs: []
   property var excludeExts: []
   property bool excludeHidden: true
@@ -106,8 +106,8 @@ Rectangle {
   }
 
   function applyDefaults() {
-    localTargetDir = "/run/media/hp/SSS"
-    localDirs = ["DOTFILES", "BRAIN", "KUBUNTU", "WIN", "MEDIA", ".Trash-1000", "node_modules", ".git"]
+    localTargetDir = Quickshell.env("HOME")
+    localDirs = ["node_modules", ".git", "__pycache__", ".venv", ".cache"]
     localExts = ["tmp", "bak", "log", "iso", "bin"]
     localHidden = true
   }
@@ -460,7 +460,7 @@ Rectangle {
 
                 Text {
                   anchors.centerIn: parent
-                  text: "SSS Drive"
+                  text: "Drives"
                   color: sssBtnMouse.containsMouse ? Color.menu.selectedText : Color.menu.text
                   font.family: settingsOverlay.fontFamily
                   font.pixelSize: Style.space(11)
@@ -471,7 +471,7 @@ Rectangle {
                   anchors.fill: parent
                   hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
-                  onClicked: settingsOverlay.localTargetDir = "/run/media/hp/SSS"
+                  onClicked: settingsOverlay.localTargetDir = Quickshell.env("HOME")
                 }
               }
 

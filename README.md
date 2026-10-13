@@ -56,7 +56,7 @@
 ## 2. Core Capabilities
 
 ### 🔍 Target Search & Typo-Tolerant Fuzzy Engine
-- **Target Drive Focus**: Configured to search any directory, with native quick toggles for secondary drives (e.g. `/run/media/hp/SSS`) and `~` (Home).
+- **Target Drive Focus**: Configured to search any directory, with native quick toggles for secondary drives (e.g. `/run/media/$USER`) and `~` (Home).
 - **fzf-Like Fuzzy Scorer (`script/Fuzzy.js`)**: Evaluates camelCase boundaries, word separators (`_`, `-`, `/`, `.`), and consecutive character match sequences so abbreviation queries (e.g. `scshot` -> `screenshot.png`) hit immediately.
 - **Smart Frecency Ordering (`script/Frecency.js`)**: Automatically boosts frequently opened and recently modified files to the top of search results.
 - **Asynchronous Execution**: Background execution prevents UI thread blockages during large drive traversals.
@@ -112,8 +112,8 @@ A native modal dialog allows live customization of indexing boundaries:
   <img src="settings-preview.png" alt="Omarchy Recon Settings & Exclusions Modal" width="95%">
 </p>
 
-- **Search Target Directory**: Editable text input with instant shortcut buttons for SSS drive and User Home.
-- **Excluded Directories**: Visual interactive chip tags (`📁 DOTFILES`, `📁 BRAIN`, `📁 node_modules`, `📁 .git`, etc.).
+- **Search Target Directory**: Editable text input with instant shortcut buttons for removable drives (`/run/media/$USER`) and User Home.
+- **Excluded Directories**: Visual interactive chip tags (`📁 node_modules`, `📁 .git`, `📁 .venv`, etc.).
 - **Excluded File Extensions**: Filter out build artifacts or temporary files (`.tmp`, `.bak`, `.log`, `.iso`, etc.).
 - **Hidden Dot-Folder Toggle**: One-switch exclusion for all hidden directories (`.*`).
 - **Atomic Persistence**: Configurations are automatically stored in `~/.config/omarchy/recon.json`.
@@ -188,16 +188,13 @@ Settings are saved automatically to `~/.config/omarchy/recon.json`:
 
 ```json
 {
-  "targetDir": "/run/media/hp/SSS",
+  "targetDir": "/home/you",
   "excludeDirs": [
-    "DOTFILES",
-    "BRAIN",
-    "KUBUNTU",
-    "WIN",
-    "MEDIA",
-    ".Trash-1000",
     "node_modules",
-    ".git"
+    ".git",
+    "__pycache__",
+    ".venv",
+    ".cache"
   ],
   "excludeExts": [
     "tmp",
@@ -266,3 +263,12 @@ omarchy restart shell
 ## 8. License
 
 This project is licensed under the [MIT License](LICENSE) © 2026 waldseelen.
+
+## Security Model
+
+- **No secrets in argv**: search queries travel through the process environment, file contents through stdin pipes. Nothing sensitive appears in `/proc/<pid>/cmdline`.
+- **No string-built shell**: all actions use argv vectors or constant scripts with positional parameters; tools get `--` / `-e` so values starting with `-` are never options.
+- **Validated input**: config values, IPC `dir`, rename and new-file names are validated in [`script/Safe.js`](script/Safe.js) (no `..`, no separators in rename, extensions limited to `[a-z0-9_+-]`).
+- **Sensitive files**: `.ssh`, `.gnupg`, `.aws`, `.env*`, `*.pem`, `*.key`, `id_*` and similar are never previewed, content-copied or content-searched. Content copy sets `wl-copy --sensitive`.
+- **Private state**: `recon.json` and `recon_frecency.json` are kept `0600`.
+- Run the checks with `node tests/test_safe.js && node tests/test_core.js && bash tests/test_cli.sh`.

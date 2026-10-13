@@ -53,14 +53,26 @@ function matchesTab(tag, tab) {
   return true;
 }
 
+function isPathPrefix(path, prefix) {
+  if (!prefix) return false;
+  var p = prefix.replace(/\/+$/, "");
+  return path === p || path.indexOf(p + "/") === 0;
+}
+
 function collapsePath(path, home, targetDir) {
   if (!path) return "";
-  if (targetDir && path.indexOf(targetDir) === 0) {
-    var rel = path.substring(targetDir.length);
-    return "SSS" + (rel.charAt(0) === "/" ? rel : "/" + rel);
+  if (targetDir && isPathPrefix(path, targetDir)) {
+    var base = targetDir.replace(/\/+$/, "");
+    var rel = path.substring(base.length);
+    var label = (home && base === home.replace(/\/+$/, "")) ? "~" : (base.substring(base.lastIndexOf("/") + 1) || "/");
+    return label + (rel.charAt(0) === "/" ? rel : "/" + rel);
   }
-  if (home && path.indexOf(home) === 0) {
-    return "~" + path.substring(home.length);
+  if (home && isPathPrefix(path, home)) {
+    return "~" + path.substring(home.replace(/\/+$/, "").length);
   }
   return path;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { collapsePath: collapsePath };
 }
