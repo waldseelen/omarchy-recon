@@ -145,11 +145,12 @@ function buildSearch(opts) {
   if (isRg) {
     var globs = "";
     for (var g = 0; g < SENSITIVE_RG_GLOBS.length; g++) globs += " --glob " + shellQuote(SENSITIVE_RG_GLOBS[g]);
-    script = prelude +
-      "timeout 20 rg --no-config --color=never --no-heading --line-number --max-count=1 --smart-case" +
+    var rgBase = "timeout 20 rg --no-config --color=never --no-heading --line-number --max-count=1 --smart-case" +
       " --max-filesize 5M --max-columns 300" +
-      (opts.excludeHidden ? "" : " --hidden") + excludeFlags + globs +
-      ' -e "$RECON_Q" -- "$t" 2>/dev/null | head -n 120';
+      (opts.excludeHidden ? "" : " --hidden") + excludeFlags + globs;
+    script = prelude +
+      '{ printf "%s\\n" "$RECON_Q" | ' + rgBase + ' -f - -- "$t" 2>/dev/null || ' +
+      'printf "%s\\n" "$RECON_Q" | ' + rgBase + ' -F -f - -- "$t" 2>/dev/null; } | head -n 120';
   } else {
     var sub = opts.sub || "all";
     var s = sanitizeExt(sub);
@@ -171,10 +172,15 @@ function buildSearch(opts) {
       else if (sub === "jpg") typeFlags = "-t f -e jpg -e jpeg";
       else typeFlags = s ? "-t f -e " + s : "-t f";
     }
+    var fdBase = "timeout 20 fd -i" + (opts.excludeHidden ? "" : " -H") + excludeFlags + " " + typeFlags;
     script = prelude +
-      "timeout 20 fd -i" + (opts.excludeHidden ? "" : " -H") + excludeFlags + " " + typeFlags +
-      (q ? "" : " --max-depth 3") +
-      ' -- "$RECON_Q" "$t" 2>/dev/null | head -n 250 | ' +
+      'if [ -n "$RECON_Q" ]; then ' +
+      '  exec 3<<<"$RECON_Q"; ' +
+      '  ' + fdBase + ' . "$t" 2>/dev/null | ' +
+      '  rg --no-config -i -F -f /dev/fd/3 2>/dev/null; ' +
+      'else ' +
+      '  ' + fdBase + ' --max-depth 3 . "$t" 2>/dev/null; ' +
+      'fi | head -n 250 | ' +
       "xargs -d '\\n' -r stat --printf='%F\\t%s\\t%n\\n' -- 2>/dev/null";
   }
 

@@ -106,11 +106,20 @@ try {
     run(fb);
     assert.ok(!fs.existsSync(pwnedCwd) && !fs.existsSync(pwned), 'fd --exec injection must not execute');
 
-    // Normal content search finds the file.
-    var ok = run(Safe.buildSearch({ isRg: true, q: 'needle', target: tmp, excludeDirs: [], excludeExts: [], excludeHidden: false, tab: 'all', sub: 'all' }));
+    // Content search finds file without exposing query on cmdline.
+    var secretQuery = 'needle';
+    var ok = run(Safe.buildSearch({ isRg: true, q: secretQuery, target: tmp, excludeDirs: [], excludeExts: [], excludeHidden: false, tab: 'all', sub: 'all' }));
     assert.ok(ok.stdout.indexOf('a.txt:1:') !== -1, 'rg should find a.txt');
     // Sensitive files are skipped by content search even with hidden enabled.
     assert.ok(ok.stdout.indexOf('.env') === -1, 'rg must skip .env');
+
+    // Unclosed regex bracket falls back safely to literal fixed string search.
+    fs.writeFileSync(path.join(tmp, 'bracket[1].txt'), 'bracket[1] content here\n');
+    var bq = run(Safe.buildSearch({ isRg: true, q: 'bracket[1]', target: tmp, excludeDirs: [], excludeExts: [], excludeHidden: false, tab: 'all', sub: 'all' }));
+    assert.ok(bq.stdout.indexOf('bracket[1].txt:1:') !== -1, 'rg fallback should find literal bracket[1]');
+
+    var fbq = run(Safe.buildSearch({ isRg: false, q: 'bracket[1]', target: tmp, excludeDirs: [], excludeExts: [], excludeHidden: false, tab: 'all', sub: 'all' }));
+    assert.ok(fbq.stdout.indexOf('bracket[1].txt') !== -1, 'fd search should find literal bracket[1]');
 
     // Malicious extension in exclude list is dropped, never executed.
     var eb = Safe.buildSearch({ isRg: false, q: 'a.txt', target: tmp, excludeDirs: ["x'; touch PWNED; '"], excludeExts: ["x'; touch PWNED; '"], excludeHidden: true, tab: 'all', sub: 'all' });

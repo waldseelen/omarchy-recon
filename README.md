@@ -266,7 +266,7 @@ This project is licensed under the [MIT License](LICENSE) © 2026 waldseelen.
 
 ## Security Model
 
-- **No secrets in argv**: search queries travel through the process environment, file contents through stdin pipes. Nothing sensitive appears in `/proc/<pid>/cmdline`.
+- **No secrets in argv**: search queries are streamed directly to `rg` and `fd` stream filters via stdin pipes and private file descriptors (`-f -` / `-f /dev/fd/3`), never expanded into command arguments. File contents stream through stdin pipes directly to `wl-copy`. Nothing sensitive appears in `/proc/<pid>/cmdline`.
 - **No string-built shell**: all actions use argv vectors or constant scripts with positional parameters; tools get `--` / `-e` so values starting with `-` are never options.
 - **Validated input**: config values, IPC `dir`, rename and new-file names are validated in [`script/Safe.js`](script/Safe.js) (no `..`, no separators in rename, extensions limited to `[a-z0-9_+-]`).
 - **Sensitive files**: `.ssh`, `.gnupg`, `.aws`, `.env*`, `*.pem`, `*.key`, `id_*` and similar are never previewed, content-copied or content-searched. Content copy sets `wl-copy --sensitive`.
