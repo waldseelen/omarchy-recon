@@ -6,6 +6,7 @@ Rectangle {
   id: rowRoot
 
   property bool isSelected: false
+  property bool isMarked: false
   property string rowTag: "FILE"
   property string rowName: ""
   property string rowDir: ""
@@ -24,27 +25,52 @@ Rectangle {
     ? Color.menu.selectedBackground
     : (rowMouse.containsMouse ? Util.alpha(Color.menu.selectedBackground, 0.25) : "transparent")
 
-  // 1. Tag Badge on the Left
-  Rectangle {
-    id: tagBadge
+  // 1. Tag Badge & Multi-select Checkmark on the Left
+  Row {
+    id: leftBadgeGroup
     anchors.left: parent.left
     anchors.leftMargin: Style.space(10)
     anchors.verticalCenter: parent.verticalCenter
-    width: Math.max(Style.space(48), tagText.implicitWidth + Style.space(12))
-    height: Style.space(22)
-    radius: Style.space(4)
-    color: rowRoot.isSelected
-      ? Util.alpha(Color.menu.selectedText, 0.25)
-      : (rowRoot.rowTag === "DIR" ? Util.alpha(Color.accent, 0.2) : (rowRoot.rowTag === "MATCH" ? Util.alpha(Color.accent, 0.3) : Util.alpha(Color.menu.border, 0.3)))
+    spacing: Style.space(6)
 
-    Text {
-      id: tagText
-      anchors.centerIn: parent
-      text: rowRoot.rowTag
-      color: rowRoot.isSelected ? Color.menu.selectedText : (rowRoot.rowTag === "DIR" || rowRoot.rowTag === "MATCH" ? Color.accent : Color.menu.text)
-      font.family: rowRoot.fontFamily
-      font.pixelSize: rowRoot.captionSize
-      font.weight: Font.Bold
+    Rectangle {
+      id: markBox
+      visible: rowRoot.isMarked
+      anchors.verticalCenter: parent.verticalCenter
+      width: Style.space(18)
+      height: Style.space(18)
+      radius: Style.space(3)
+      color: Color.accent
+
+      Text {
+        anchors.centerIn: parent
+        text: "✓"
+        color: Color.menu.selectedText
+        font.family: rowRoot.fontFamily
+        font.pixelSize: Style.space(11)
+        font.weight: Font.Bold
+      }
+    }
+
+    Rectangle {
+      id: tagBadge
+      anchors.verticalCenter: parent.verticalCenter
+      width: Math.max(Style.space(48), tagText.implicitWidth + Style.space(12))
+      height: Style.space(22)
+      radius: Style.space(4)
+      color: rowRoot.isSelected
+        ? Util.alpha(Color.menu.selectedText, 0.25)
+        : (rowRoot.rowTag === "DIR" ? Util.alpha(Color.accent, 0.2) : (rowRoot.rowTag === "MATCH" ? Util.alpha(Color.accent, 0.3) : Util.alpha(Color.menu.border, 0.3)))
+
+      Text {
+        id: tagText
+        anchors.centerIn: parent
+        text: rowRoot.rowTag
+        color: rowRoot.isSelected ? Color.menu.selectedText : (rowRoot.rowTag === "DIR" || rowRoot.rowTag === "MATCH" ? Color.accent : Color.menu.text)
+        font.family: rowRoot.fontFamily
+        font.pixelSize: rowRoot.captionSize
+        font.weight: Font.Bold
+      }
     }
   }
 
@@ -66,7 +92,7 @@ Rectangle {
 
   // 3. Name & Dir Column in the Middle (flexible width anchored between badge and size)
   Column {
-    anchors.left: tagBadge.right
+    anchors.left: leftBadgeGroup.right
     anchors.leftMargin: Style.space(10)
     anchors.right: sizeLabel.left
     anchors.rightMargin: Style.space(10)

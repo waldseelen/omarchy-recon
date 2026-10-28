@@ -14,6 +14,7 @@ Item {
   property bool isImage: false
   property bool isDir: false
   property bool isLoading: false
+  property string layout: "side" // "side" | "bottom"
 
   signal copyRequested()
 
@@ -23,18 +24,21 @@ Item {
     textFlickable.contentY = 0
   }
 
-  // Vertical Divider
+  // Divider (Vertical for side layout, Horizontal for bottom layout)
   Rectangle {
     anchors.left: parent.left
     anchors.top: parent.top
-    anchors.bottom: parent.bottom
-    width: 1
+    anchors.bottom: previewRoot.layout === "side" ? parent.bottom : undefined
+    anchors.right: previewRoot.layout === "bottom" ? parent.right : undefined
+    width: previewRoot.layout === "side" ? 1 : parent.width
+    height: previewRoot.layout === "bottom" ? 1 : parent.height
     color: Util.alpha(Color.menu.border, 0.4)
   }
 
   Item {
     anchors.fill: parent
-    anchors.leftMargin: Style.space(16)
+    anchors.leftMargin: previewRoot.layout === "side" ? Style.space(16) : Style.space(4)
+    anchors.topMargin: previewRoot.layout === "bottom" ? Style.space(8) : Style.space(0)
 
     // Preview Header Bar
     Rectangle {
@@ -45,31 +49,61 @@ Item {
       height: Style.space(42)
       color: "transparent"
 
-      Column {
+      Row {
+        id: titleRow
         anchors.left: parent.left
         anchors.right: copyBtn.left
         anchors.rightMargin: Style.space(8)
         anchors.verticalCenter: parent.verticalCenter
-        spacing: Style.space(2)
+        spacing: Style.space(8)
 
-        Text {
-          text: previewRoot.fileName || "Preview"
-          color: Color.menu.text
-          font.family: Style.font.family
-          font.pixelSize: Style.font.body
-          font.weight: Font.DemiBold
-          elide: Text.ElideRight
-          width: parent.width
+        // Type Badge
+        Rectangle {
+          id: previewTagBadge
+          visible: previewRoot.tag.length > 0
+          anchors.verticalCenter: parent.verticalCenter
+          width: pTagText.implicitWidth + Style.space(10)
+          height: Style.space(20)
+          radius: Style.space(3)
+          color: previewRoot.tag === "ARCHIVE" ? Util.alpha(Color.accent, 0.3) :
+            (previewRoot.tag === "MEDIA" ? Util.alpha(Color.accent, 0.25) :
+            (previewRoot.tag === "MATCH" ? Util.alpha(Color.accent, 0.35) : Util.alpha(Color.menu.border, 0.3)))
+
+          Text {
+            id: pTagText
+            anchors.centerIn: parent
+            text: previewRoot.tag
+            color: (previewRoot.tag === "ARCHIVE" || previewRoot.tag === "MEDIA" || previewRoot.tag === "MATCH") ? Color.accent : Color.menu.text
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
+            font.weight: Font.Bold
+          }
         }
 
-        Text {
-          text: (previewRoot.sizeText ? previewRoot.sizeText + "  ·  " : "") + previewRoot.fullPath
-          color: Color.menu.text
-          opacity: 0.55
-          font.family: Style.font.family
-          font.pixelSize: Style.font.caption
-          elide: Text.ElideMiddle
-          width: parent.width
+        Column {
+          anchors.verticalCenter: parent.verticalCenter
+          width: parent.width - (previewTagBadge.visible ? previewTagBadge.width + Style.space(8) : 0)
+          spacing: Style.space(2)
+
+          Text {
+            text: previewRoot.fileName || "Preview"
+            color: Color.menu.text
+            font.family: Style.font.family
+            font.pixelSize: Style.font.body
+            font.weight: Font.DemiBold
+            elide: Text.ElideRight
+            width: parent.width
+          }
+
+          Text {
+            text: (previewRoot.sizeText ? previewRoot.sizeText + "  ·  " : "") + previewRoot.fullPath
+            color: Color.menu.text
+            opacity: 0.55
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
+            elide: Text.ElideMiddle
+            width: parent.width
+          }
         }
       }
 
@@ -167,7 +201,7 @@ Item {
 
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
-          text: previewRoot.isDir ? "📁" : "📄"
+          text: previewRoot.isDir ? "📁" : (previewRoot.tag === "ARCHIVE" ? "📦" : (previewRoot.tag === "MEDIA" ? "🎵" : "📄"))
           font.pixelSize: Style.space(32)
         }
 

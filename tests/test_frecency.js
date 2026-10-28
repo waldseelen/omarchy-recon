@@ -29,4 +29,16 @@ for (let i = 0; i < 600; i++) {
 const pruned = Frecency.prune(bigData, 500);
 assert.strictEqual(Object.keys(pruned).length, 500, 'Pruning should cap entries at 500');
 
+// 5. Remove access deletes entry
+data = Frecency.removeAccess(data, '/test/doc.md');
+assert.strictEqual(data['/test/doc.md'], undefined, 'Removed path should not exist');
+assert.strictEqual(Frecency.getScore(data, '/test/doc.md'), 0, 'Removed path score should be 0');
+
+// 6. Rename access moves entry to new key
+data = Frecency.recordAccess(data, '/test/old.md');
+const oldScore = Frecency.getScore(data, '/test/old.md');
+data = Frecency.renameAccess(data, '/test/old.md', '/test/new.md');
+assert.strictEqual(data['/test/old.md'], undefined, 'Old path should be removed');
+assert.strictEqual(Frecency.getScore(data, '/test/new.md'), oldScore, 'New path should inherit score');
+
 console.log("All Frecency tests passed successfully!");

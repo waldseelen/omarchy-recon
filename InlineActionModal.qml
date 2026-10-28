@@ -12,11 +12,14 @@ Rectangle {
   focus: true
   Keys.priority: Keys.BeforeItem
 
-  property string mode: "rename" // "rename" | "newfile" | "trash"
+  property string mode: "rename" // "rename" | "newfile" | "trash" | "duplicate" | "move"
   property string targetPath: ""
   property string initialValue: ""
-  property string promptText: mode === "rename" ? "Rename Item" : (mode === "trash" ? "Move to Trash? (Enter = yes, Esc = cancel)" : "Create New File / Note")
-  property string subText: (mode === "rename" || mode === "trash") ? targetPath : "File will be created in target directory"
+  property string promptText: mode === "rename" ? "Rename Item" :
+    (mode === "trash" ? "Move to Trash? (Enter = yes, Esc = cancel)" :
+    (mode === "duplicate" ? "Duplicate Item (New Name)" :
+    (mode === "move" ? "Move Item (Destination Folder)" : "Create New File / Note")))
+  property string subText: (mode === "rename" || mode === "trash" || mode === "duplicate" || mode === "move") ? targetPath : "File will be created in target directory"
 
   signal confirmed(string mode, string value, string targetPath)
   signal closed()
@@ -24,7 +27,7 @@ Rectangle {
   function initFocus() {
     inputField.text = initialValue
     inputField.forceActiveFocus()
-    if (mode === "rename") {
+    if (mode === "rename" || mode === "duplicate") {
       var dotIdx = initialValue.lastIndexOf(".")
       if (dotIdx > 0) {
         inputField.select(0, dotIdx)
@@ -58,7 +61,7 @@ Rectangle {
 
   BorderSurface {
     id: modalCard
-    width: Math.min(Style.space(460), parent.width - Style.space(40))
+    width: Math.min(Style.space(480), parent.width - Style.space(40))
     height: Math.min(Style.space(210), parent.height - Style.space(40))
     radius: Style.cornerRadius
     anchors.centerIn: parent
@@ -184,7 +187,10 @@ Rectangle {
           Text {
             id: confirmText
             anchors.centerIn: parent
-            text: modalOverlay.mode === "rename" ? "Rename (↵)" : (modalOverlay.mode === "trash" ? "Trash (↵)" : "Create (↵)")
+            text: modalOverlay.mode === "rename" ? "Rename (↵)" :
+              (modalOverlay.mode === "trash" ? "Trash (↵)" :
+              (modalOverlay.mode === "duplicate" ? "Duplicate (↵)" :
+              (modalOverlay.mode === "move" ? "Move (↵)" : "Create (↵)")))
             color: Color.menu.selectedText
             font.family: Style.font.family
             font.pixelSize: Style.space(11)

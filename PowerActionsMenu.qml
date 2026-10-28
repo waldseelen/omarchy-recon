@@ -26,8 +26,11 @@ Rectangle {
     { id: "term", icon: "💻", title: "Open in Terminal", desc: "Open containing folder in terminal" },
     { id: "editor", icon: "✏️", title: "Open in Editor", desc: "Open file in text editor" },
     { id: "copyPath", icon: "📍", title: "Copy Full Path", desc: "Copy absolute path to clipboard" },
+    { id: "copyUri", icon: "📎", title: "Copy File (URI)", desc: "Copy file:// URI for file managers" },
     { id: "copyRelPath", icon: "📋", title: "Copy Relative Path", desc: "Copy path relative to target drive" },
     { id: "copyContent", icon: "📄", title: "Copy File Content", desc: "Copy entire preview text to clipboard" },
+    { id: "duplicate", icon: "📑", title: "Duplicate Item", desc: "Create an exact copy of file" },
+    { id: "move", icon: "📦", title: "Move Item", desc: "Move item to destination folder" },
     { id: "trash", icon: "🗑️", title: "Move to Trash", desc: "Send safely to system trash" }
   ]
 
@@ -78,7 +81,7 @@ Rectangle {
   BorderSurface {
     id: actionCard
     width: Math.min(Style.space(480), parent.width - Style.space(40))
-    height: Math.min(Style.space(380), parent.height - Style.space(40))
+    height: Math.min(Style.space(420), parent.height - Style.space(40))
     radius: Style.cornerRadius
     anchors.centerIn: parent
     color: Color.menu.background
@@ -98,99 +101,57 @@ Rectangle {
       anchors.rightMargin: actionCard.contentRightInset
 
       // Header
-      Rectangle {
-        id: actHeader
+      Column {
+        id: headerBox
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: Style.space(38)
-        color: "transparent"
+        spacing: Style.space(2)
 
-        Column {
-          anchors.left: parent.left
-          anchors.right: closeBtn.left
-          anchors.verticalCenter: parent.verticalCenter
-          spacing: Style.space(2)
-
-          Text {
-            text: "⚡ Power Actions"
-            color: Color.menu.text
-            font.family: Style.font.family
-            font.pixelSize: Style.font.heading ? Style.font.heading : 14
-            font.weight: Font.Bold
-          }
-
-          Text {
-            text: actionsOverlay.targetName || actionsOverlay.targetPath
-            color: Color.menu.text
-            opacity: 0.6
-            font.family: Style.font.family
-            font.pixelSize: Style.font.caption
-            elide: Text.ElideMiddle
-            width: parent.width
-          }
+        Text {
+          text: "Actions for " + (actionsOverlay.targetName || "Item")
+          color: Color.menu.text
+          font.family: Style.font.family
+          font.pixelSize: Style.font.heading ? Style.font.heading : 14
+          font.weight: Font.Bold
+          elide: Text.ElideRight
+          width: parent.width
         }
 
-        Rectangle {
-          id: closeBtn
-          anchors.right: parent.right
-          anchors.verticalCenter: parent.verticalCenter
-          width: Style.space(26)
-          height: Style.space(26)
-          radius: Style.cornerRadius
-          color: closeMouse.containsMouse ? Color.menu.selectedBackground : "transparent"
-
-          Text {
-            anchors.centerIn: parent
-            text: "✕"
-            color: closeMouse.containsMouse ? Color.menu.selectedText : Color.menu.text
-            font.pixelSize: Style.space(12)
-          }
-
-          MouseArea {
-            id: closeMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: actionsOverlay.closed()
-          }
+        Text {
+          text: actionsOverlay.targetPath
+          color: Color.menu.text
+          opacity: 0.55
+          font.family: Style.font.family
+          font.pixelSize: Style.font.caption
+          elide: Text.ElideMiddle
+          width: parent.width
         }
       }
 
-      // Divider
-      Rectangle {
-        id: actDivider
-        anchors.top: actHeader.bottom
-        anchors.topMargin: Style.space(6)
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: 1
-        color: Util.alpha(Color.menu.border, 0.3)
-      }
-
-      // Action List
+      // Actions List
       ListView {
-        id: actList
-        anchors.top: actDivider.bottom
-        anchors.topMargin: Style.space(8)
+        id: actionsView
+        anchors.top: headerBox.bottom
+        anchors.topMargin: Style.space(10)
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: actFooter.top
-        anchors.bottomMargin: Style.space(6)
+        anchors.bottom: footerHint.top
+        anchors.bottomMargin: Style.space(8)
         model: actionsOverlay.actionsList
         clip: true
-        spacing: Style.space(3)
-        currentIndex: actionsOverlay.selectedIndex
+        spacing: Style.space(4)
+        boundsBehavior: Flickable.StopAtBounds
 
         delegate: Rectangle {
-          id: actItem
-          required property var modelData
+          id: actionItem
           required property int index
+          required property var modelData
 
-          width: actList.width
-          height: Style.space(36)
-          radius: Style.space(4)
-          color: index === actionsOverlay.selectedIndex ? Color.menu.selectedBackground : "transparent"
+          width: ListView.view ? ListView.view.width : Style.space(440)
+          height: Style.space(34)
+          radius: Style.cornerRadius
+          color: index === actionsOverlay.selectedIndex ? Color.menu.selectedBackground : (itemMouse.containsMouse ? Util.alpha(Color.menu.selectedBackground, 0.2) : "transparent")
 
           Row {
             anchors.fill: parent
@@ -200,58 +161,60 @@ Rectangle {
 
             Text {
               anchors.verticalCenter: parent.verticalCenter
-              text: actItem.modelData.icon
+              text: actionItem.modelData.icon
               font.pixelSize: Style.space(14)
             }
 
             Column {
               anchors.verticalCenter: parent.verticalCenter
-              spacing: 1
+              width: parent.width - Style.space(32)
+              spacing: Style.space(1)
 
               Text {
-                text: actItem.modelData.title
-                color: actItem.index === actionsOverlay.selectedIndex ? Color.menu.selectedText : Color.menu.text
+                text: actionItem.modelData.title
+                color: index === actionsOverlay.selectedIndex ? Color.menu.selectedText : Color.menu.text
                 font.family: Style.font.family
-                font.pixelSize: Style.space(12)
-                font.weight: actItem.index === actionsOverlay.selectedIndex ? Font.DemiBold : Font.Normal
+                font.pixelSize: Style.font.body ? Style.font.body : 12
+                font.weight: index === actionsOverlay.selectedIndex ? Font.DemiBold : Font.Normal
+                elide: Text.ElideRight
+                width: parent.width
               }
 
               Text {
-                text: actItem.modelData.desc
-                color: actItem.index === actionsOverlay.selectedIndex ? Color.menu.selectedText : Color.menu.text
-                opacity: 0.7
+                text: actionItem.modelData.desc
+                color: index === actionsOverlay.selectedIndex ? Color.menu.selectedText : Color.menu.text
+                opacity: index === actionsOverlay.selectedIndex ? 0.85 : 0.55
                 font.family: Style.font.family
-                font.pixelSize: Style.space(10)
+                font.pixelSize: Style.font.caption ? Style.font.caption : 10
+                elide: Text.ElideRight
+                width: parent.width
               }
             }
           }
 
           MouseArea {
+            id: itemMouse
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onEntered: actionsOverlay.selectedIndex = actItem.index
-            onClicked: actionsOverlay.executed(actItem.modelData.id, actionsOverlay.targetPath)
+            onClicked: {
+              actionsOverlay.selectedIndex = actionItem.index
+              actionsOverlay.executed(actionItem.modelData.id, actionsOverlay.targetPath)
+            }
           }
         }
       }
 
-      // Keyboard Hints Footer
-      Row {
-        id: actFooter
+      // Footer Hint
+      Text {
+        id: footerHint
         anchors.bottom: parent.bottom
         anchors.horizontalCenter: parent.horizontalCenter
-        height: Style.space(20)
-        spacing: Style.space(12)
-        opacity: 0.7
-
-        Text {
-          anchors.verticalCenter: parent.verticalCenter
-          text: "↑↓ Navigate  •  ↵ Execute  •  Esc Return"
-          color: Color.menu.text
-          font.family: Style.font.family
-          font.pixelSize: Style.space(11)
-        }
+        text: "↑/↓ or ^J/^K to navigate  ·  ↵ to execute  ·  Esc to cancel"
+        color: Color.menu.text
+        opacity: 0.5
+        font.family: Style.font.family
+        font.pixelSize: Style.space(10)
       }
     }
   }

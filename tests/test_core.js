@@ -17,4 +17,13 @@ assert.strictEqual(Core.collapsePath('', '/home/u', '/data/media'), '');
 // No personal drive name leaks from source.
 assert.ok(require('fs').readFileSync(__dirname + '/../script/Core.js', 'utf8').indexOf('SSS') === -1);
 
+// Tag and Tab matching
+assert.strictEqual(Core.getTag('/path/to/archive.zip', false), 'ARCHIVE');
+assert.strictEqual(Core.getTag('/path/to/archive.tar.gz', false), 'ARCHIVE');
+assert.strictEqual(Core.getTag('/path/to/music.mp3', false), 'MEDIA');
+assert.strictEqual(Core.getTag('/path/to/video.mp4', false), 'MEDIA');
+assert.strictEqual(Core.getTag('/path/to/component.qml', false), 'CODE');
+assert.ok(Core.matchesTab('ARCHIVE', 'archives'));
+assert.ok(Core.matchesTab('MEDIA', 'media'));
+
 console.log("All Core tests passed.");

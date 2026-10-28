@@ -46,10 +46,27 @@ function prune(data, maxEntries) {
   return pruned;
 }
 
+function removeAccess(data, path) {
+  if (!data || !path || !data[path]) return data || {};
+  var res = JSON.parse(JSON.stringify(data));
+  delete res[path];
+  return res;
+}
+
+function renameAccess(data, oldPath, newPath) {
+  if (!data || !oldPath || !newPath || !data[oldPath]) return data || {};
+  var res = JSON.parse(JSON.stringify(data));
+  res[newPath] = res[oldPath];
+  delete res[oldPath];
+  return res;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     recordAccess: recordAccess,
     getScore: getScore,
-    prune: prune
+    prune: prune,
+    removeAccess: removeAccess,
+    renameAccess: renameAccess
   };
 }

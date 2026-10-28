@@ -9,6 +9,7 @@ Item {
   property int itemCount: 0
   property bool isSearching: false
   property bool isContentSearch: false
+  property bool includeIgnored: false
   property string fontFamily: Style.font.family
   property int headingSize: Style.font.heading ? Style.font.heading : 16
   property int captionSize: Style.font.caption ? Style.font.caption : 11
@@ -16,6 +17,7 @@ Item {
   signal cleared()
   signal settingsClicked()
   signal contentSearchToggled()
+  signal includeIgnoredToggled()
 
   height: Math.max(Style.space(42), Style.font.title + Style.spacing.controlPaddingY * 2)
 
@@ -37,13 +39,41 @@ Item {
       opacity: 0.85
     }
 
-    // 2. Right Controls (Status Badge + Mode Toggle + Settings Button)
+    // 2. Right Controls (Status Badge + Ignored Toggle + Mode Toggle + Settings Button)
     Row {
       id: rightControls
       anchors.right: parent.right
       anchors.rightMargin: Style.space(10)
       anchors.verticalCenter: parent.verticalCenter
       spacing: Style.space(8)
+
+      // Ignored / Gitignore Toggle Badge
+      Rectangle {
+        anchors.verticalCenter: parent.verticalCenter
+        width: ignoredText.implicitWidth + Style.space(14)
+        height: Style.space(24)
+        radius: Style.space(4)
+        color: headerRoot.includeIgnored ? Color.accent : Util.alpha(Color.menu.border, 0.25)
+        border.width: 1
+        border.color: headerRoot.includeIgnored ? Color.menu.selectedBorder : Util.alpha(Color.menu.border, 0.4)
+
+        Text {
+          id: ignoredText
+          anchors.centerIn: parent
+          text: headerRoot.includeIgnored ? "🚫 IGNORED (Alt+I)" : "Gitignore (Alt+I)"
+          color: headerRoot.includeIgnored ? Color.menu.selectedText : Color.menu.text
+          opacity: headerRoot.includeIgnored ? 1.0 : 0.65
+          font.family: Style.font.family
+          font.pixelSize: headerRoot.captionSize
+          font.weight: headerRoot.includeIgnored ? Font.Bold : Font.Normal
+        }
+
+        MouseArea {
+          anchors.fill: parent
+          cursorShape: Qt.PointingHandCursor
+          onClicked: headerRoot.includeIgnoredToggled()
+        }
+      }
 
       // Content Search Mode Toggle Badge
       Rectangle {

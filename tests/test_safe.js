@@ -50,17 +50,46 @@ assert.strictEqual(Safe.sanitizeRelPath('/etc/passwd'), '');
 assert.strictEqual(Safe.sanitizeRelPath('a/'), '');
 assert.strictEqual(Safe.sanitizeRelPath('a\nb'), '');
 
+// ---- escapeRegex ----
+assert.strictEqual(Safe.escapeRegex('a.b*c'), 'a\\.b\\*c');
+assert.strictEqual(Safe.escapeRegex('[test]'), '\\[test\\]');
+
+// ---- buildFuzzyPattern ----
+assert.strictEqual(Safe.buildFuzzyPattern('abc'), 'a.*b.*c');
+assert.strictEqual(Safe.buildFuzzyPattern('a b'), '(?:a.*b|b.*a)');
+assert.ok(Safe.buildFuzzyPattern('a b c').indexOf('a.*b.*c') !== -1);
+
+// ---- parseOperators ----
+var pop1 = Safe.parseOperators('budget @today ext:pdf >10M');
+assert.strictEqual(pop1.cleanQuery, 'budget');
+assert.strictEqual(pop1.changedWithin, '1d');
+assert.strictEqual(pop1.size, '+10M');
+assert.strictEqual(pop1.ext, 'pdf');
+
+var pop2 = Safe.parseOperators('report @week <500k');
+assert.strictEqual(pop2.cleanQuery, 'report');
+assert.strictEqual(pop2.changedWithin, '7d');
+assert.strictEqual(pop2.size, '-500k');
+
 // ---- sanitizeConfig ----
 var cfg = Safe.sanitizeConfig({
   targetDir: 'relative',
   excludeDirs: ['ok', 'bad\nname', 5],
   excludeExts: ['tmp', "x'; touch /tmp/pwn; '", '.BAK'],
-  excludeHidden: 'yes'
+  excludeHidden: 'yes',
+  pinnedDirs: ['/home/u/docs', 'relative/bad'],
+  previewVisible: false,
+  previewLayout: 'bottom',
+  includeIgnored: true
 }, { targetDir: '/home/u', excludeDirs: ['d'], excludeExts: ['e'], excludeHidden: true });
 assert.strictEqual(cfg.targetDir, '/home/u');
 assert.deepStrictEqual(cfg.excludeDirs, ['ok']);
 assert.deepStrictEqual(cfg.excludeExts, ['tmp', 'bak']);
 assert.strictEqual(cfg.excludeHidden, true);
+assert.deepStrictEqual(cfg.pinnedDirs, ['/home/u/docs']);
+assert.strictEqual(cfg.previewVisible, false);
+assert.strictEqual(cfg.previewLayout, 'bottom');
+assert.strictEqual(cfg.includeIgnored, true);
 assert.strictEqual(Safe.sanitizeConfig({ targetDir: '/data' }, { targetDir: '/home/u' }).targetDir, '/data');
 assert.strictEqual(Safe.sanitizeConfig(null, { targetDir: '/home/u' }).targetDir, '/home/u');
 

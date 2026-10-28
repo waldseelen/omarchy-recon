@@ -36,9 +36,11 @@ function getTag(path, isDir) {
   if (ext === "md" || ext === "txt" || ext === "org") return "DOC";
   if (ext === "pdf") return "PDF";
   if (ext === "json") return "JSON";
-  if (/^(py|js|ts|m|sh|html|css|lua|c|cpp|rs|go|h)$/.test(ext)) return "CODE";
+  if (/^(py|js|ts|m|sh|html|css|lua|c|cpp|rs|go|h|hpp|qml)$/.test(ext)) return "CODE";
   if (/^(docx|doc|odt|xlsx|pptx|csv)$/.test(ext)) return "OFFICE";
-  if (/^(png|jpg|jpeg|webp|gif|svg|bmp)$/.test(ext)) return "IMAGE";
+  if (/^(png|jpg|jpeg|webp|gif|svg|bmp|ico)$/.test(ext)) return "IMAGE";
+  if (/^(zip|tar|gz|tgz|bz2|xz|7z|rar|zst)$/.test(ext)) return "ARCHIVE";
+  if (/^(mp3|flac|wav|ogg|m4a|mp4|mkv|avi|webm|mov)$/.test(ext)) return "MEDIA";
   return "FILE";
 }
 
@@ -50,6 +52,8 @@ function matchesTab(tag, tab) {
   if (tab === "pdf") return tag === "PDF";
   if (tab === "office") return tag === "OFFICE";
   if (tab === "images") return tag === "IMAGE";
+  if (tab === "media") return tag === "MEDIA";
+  if (tab === "archives") return tag === "ARCHIVE";
   return true;
 }
 
@@ -74,5 +78,14 @@ function collapsePath(path, home, targetDir) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { collapsePath: collapsePath };
+  module.exports = {
+    formatBytes: formatBytes,
+    getBaseName: getBaseName,
+    getDirName: getDirName,
+    getExtension: getExtension,
+    getTag: getTag,
+    matchesTab: matchesTab,
+    isPathPrefix: isPathPrefix,
+    collapsePath: collapsePath
+  };
 }
